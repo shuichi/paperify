@@ -1,5 +1,9 @@
 # Paperify
 
+<p align="center">
+  <img src="./icon.svg" alt="Paperify icon" width="120" height="120">
+</p>
+
 **CSS-first academic publishing: Markdown in, one portable HTML file out — readable on screen, printable as a two-column paper.**
 
 Paperify is a lightweight Markdown-to-HTML converter for academic writing. It is deliberately *not* a LaTeX clone. The converter stays small and emits minimal, semantic HTML; a carefully authored stylesheet (`paperify.css`) carries the layout and typography for both media:
