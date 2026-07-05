@@ -33,6 +33,10 @@
     "example": "npm run build && node dist/cli.js examples/sample.md -o dist/sample.html"
   },
   "dependencies": {
+    "@citation-js/plugin-bibtex": "^0.7.21",
+    "@citation-js/plugin-csl": "^0.7.22",
+    "citation-js": "^0.7.22",
+    "citeproc": "^2.4.63",
     "gray-matter": "^4.0.3",
     "katex": "^0.17.0",
     "mdast-util-directive": "^3.1.0",

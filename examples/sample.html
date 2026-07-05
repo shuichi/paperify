@@ -554,13 +554,61 @@ hr {
 }
 
 /* --------------------------------------------------------------------------
-   13. Utility visibility classes
+   13. Citations & references
+   -------------------------------------------------------------------------- */
+
+.paper-content .citation {
+  white-space: nowrap;
+}
+
+.paper-content .paper-references {
+  margin-top: 3rem;
+  border-top: 1px solid var(--rule-color);
+  padding-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.paper-content .paper-references h2 {
+  margin-top: 0;
+}
+
+.paper-content .csl-bib-body {
+  margin-top: 0.75em;
+}
+
+.paper-content .csl-entry {
+  margin-bottom: 0.55em;
+  padding-left: 1.5em;
+  text-indent: -1.5em;
+}
+
+.paper-content .csl-second-field-align .csl-entry {
+  padding-left: 0;
+  text-indent: 0;
+}
+
+.paper-content .csl-left-margin {
+  float: left;
+  width: 2.4em;
+  padding-right: 0.5em;
+  text-indent: 0;
+  text-align: right;
+}
+
+.paper-content .csl-right-inline {
+  display: block;
+  padding-left: 2.4em;
+  text-indent: 0;
+}
+
+/* --------------------------------------------------------------------------
+   14. Utility visibility classes
    -------------------------------------------------------------------------- */
 
 .print-only { display: none; }
 
 /* --------------------------------------------------------------------------
-   14. Small screens
+   15. Small screens
    -------------------------------------------------------------------------- */
 
 @media (max-width: 480px) {
@@ -582,7 +630,7 @@ hr {
 }
 
 /* ==========================================================================
-   15. PRINT — two-column A4 academic paper
+   16. PRINT — two-column A4 academic paper
    ==========================================================================
    The front matter (title, authors, abstract, keywords) stays single
    column; `.paper-content` flows into two columns. Break control keeps
@@ -699,6 +747,7 @@ hr {
   .paper-content table,
   .paper-content pre,
   .paper-content blockquote,
+  .paper-content .csl-entry,
   .katex-display {
     break-inside: avoid;
     page-break-inside: avoid;    /* legacy engines */
@@ -835,6 +884,21 @@ hr {
     font-size: 7.5pt;
   }
 
+  .paper-content .paper-references {
+    margin-top: 6mm;
+    padding-top: 3mm;
+    font-size: 8pt;
+    text-align: left;
+  }
+
+  .paper-content .paper-references h2 {
+    font-size: 11pt;
+  }
+
+  .paper-content .citation {
+    white-space: normal;
+  }
+
   .paper-content a[data-footnote-backref] {
     display: none;               /* back-arrows are meaningless on paper */
   }
@@ -882,7 +946,8 @@ expressed in plain Markdown while remaining printable.</p>
 <h2 id="introduction">Introduction</h2>
 <p>Academic writing tools tend to cluster at two extremes: heavyweight LaTeX
 toolchains with excellent print output, and web-first Markdown renderers
-with no print story at all. Paperify sits deliberately between them<sup><a href="#user-content-fn-1" id="user-content-fnref-1" data-footnote-ref aria-describedby="footnote-label">1</a></sup>.
+with no print story at all. Paperify sits deliberately between them, taking
+some inspiration from Pandoc's document conversion model <span class="citation" data-cites="macfarlane2006pandoc">[2]</span><sup><a href="#user-content-fn-1" id="user-content-fnref-1" data-footnote-ref aria-describedby="footnote-label">1</a></sup>.
 The authoring format is plain Markdown, the output is a single portable
 HTML file, and the <em>same</em> document reads comfortably on a phone and
 prints as a two-column paper.</p>
@@ -939,7 +1004,8 @@ output size. Values are the median of ten runs.</p>
 </tr>
 </tbody>
 </table>
-<p>The conversion pipeline itself is short. The core of it looks like this:</p>
+<p>The conversion pipeline itself is short and builds on unified's structured
+content model <span class="citation" data-cites="unified2015unified">[3]</span>. The core of it looks like this:</p>
 <pre><code class="hljs language-ts"><span class="hljs-keyword">const</span> processor = <span class="hljs-title function_">unified</span>()
   .<span class="hljs-title function_">use</span>(remarkParse)
   .<span class="hljs-title function_">use</span>(remarkGfm)
@@ -959,18 +1025,14 @@ the document is still valid Markdown everywhere else.</p>
 <h2 id="discussion">Discussion</h2>
 <p>Two-column print layout in browsers is imperfect: column balancing and
 break control vary by engine<sup><a href="#user-content-fn-2" id="user-content-fnref-2" data-footnote-ref aria-describedby="footnote-label">2</a></sup>. Paperify accepts this trade-off in
-exchange for a zero-install toolchain. Advanced float placement and true
-page-bottom footnotes are explicitly out of scope for v1.</p>
+exchange for a zero-install toolchain. It borrows some typographic discipline
+from TeX-era publishing without trying to become TeX <span class="citation" data-cites="knuth1984texbook">[1]</span>.
+Advanced float placement and true page-bottom footnotes are explicitly out
+of scope for v1.</p>
 <h2 id="conclusion">Conclusion</h2>
 <p>Paperify shows that a Markdown pipeline plus one disciplined stylesheet
 is enough for readable, printable academic documents. The converter
 stays small; the CSS carries the craft.</p>
-<h2 id="references">References</h2>
-<ol>
-<li>MacFarlane, J. <em>Pandoc: a universal document converter.</em> 2006–2026.</li>
-<li>The unified collective. <em>unified: content as structured data.</em> 2015–2026.</li>
-<li>Knuth, D. E. <em>The TeXbook.</em> Addison-Wesley, 1984.</li>
-</ol>
 <section data-footnotes class="footnotes"><h2 class="sr-only" id="footnote-label">Footnotes</h2>
 <ol>
 <li id="user-content-fn-1">
@@ -982,6 +1044,20 @@ neither endorse nor apologize for. <a href="#user-content-fnref-1" data-footnote
 print output at the time of writing. <a href="#user-content-fnref-2" data-footnote-backref="" aria-label="Back to reference 2" class="data-footnote-backref">↩</a></p>
 </li>
 </ol>
+</section>
+<section class="paper-references csl-second-field-align" id="references">
+<h2>References</h2>
+<div class="csl-bib-body">
+  <div class="csl-entry">
+    <div class="csl-left-margin">[1]</div><div class="csl-right-inline">Donald E. Knuth. 1984. <i>The TeXbook</i>. Addison-Wesley.</div>
+  </div>
+  <div class="csl-entry">
+    <div class="csl-left-margin">[2]</div><div class="csl-right-inline">John MacFarlane. 2006. Pandoc: A Universal Document Converter. Retrieved from https://pandoc.org</div>
+  </div>
+  <div class="csl-entry">
+    <div class="csl-left-margin">[3]</div><div class="csl-right-inline">The unified collective. 2015. unified: Content as Structured Data. Retrieved from https://unifiedjs.com</div>
+  </div>
+</div>
 </section>
   </article>
 </main>

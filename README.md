@@ -43,6 +43,11 @@ paperify <input.md> [options]
 --css <file>          Custom CSS file path (default: bundled paperify.css)
 --fontset <name>      Add bundled font CSS after the base stylesheet
                       (for example: japanese)
+--bib, --bibliography <file>
+                      BibTeX bibliography file
+                      (default: <input>.bib when present)
+--csl <id>            Zotero Style Repository CSL style ID
+                      (default: computing-surveys)
 --embed-css           Compatibility option; compiled HTML always embeds CSS
 --unsafe-html         Allow sanitized raw HTML inside Markdown
 --title <title>       Override title from frontmatter
@@ -98,6 +103,29 @@ All fields are optional. Authors may also be plain strings, and keywords may be 
 Math is rendered **statically at build time** with KaTeX — the output HTML needs no JavaScript to display equations. Compiled HTML embeds the KaTeX stylesheet and fonts from the installed `katex` package.
 
 In print, display equations are kept inside their column, sized with restraint, and prevented from breaking across columns where the engine supports it. On screen, very long equations scroll horizontally instead of overflowing.
+
+### Citations and references
+
+BibTeX-backed citations use Pandoc-style citation keys:
+
+```markdown
+Paperify builds on structured Markdown processing [@unified2015unified].
+Multiple sources can appear in one cluster [@foo; @bar].
+```
+
+By default, Paperify looks for a BibTeX file beside the input Markdown with the same basename. For `paper.md`, it uses `paper.bib` when that file exists. You can pass a bibliography explicitly:
+
+```bash
+paperify paper.md --bib references.bib -o paper.html
+```
+
+Citation formatting is produced at build time with Citation.js and citeproc-js. The CSL style is downloaded by ID from the Zotero Style Repository. The default style is `computing-surveys`; choose another Zotero style ID with `--csl`:
+
+```bash
+paperify paper.md --csl association-for-computing-machinery -o paper.html
+```
+
+The generated citations and references are static HTML, so the compiled document still needs no runtime JavaScript.
 
 ### Images and figures
 
@@ -217,7 +245,7 @@ The file is organized into numbered, commented sections (tokens → base → rea
 ## Limitations
 
 - **Not a full LaTeX replacement.** No numbered equations/theorems, cross-reference resolution, or automatic figure numbering.
-- **No citation processor in v1.** Write the references section manually in Markdown (BibTeX/CSL support would layer cleanly on the pipeline later).
+- **Citation support is intentionally small.** It supports BibTeX keys such as `[@key]` and CSL bibliographies, but not citation locators, citation prefixes/suffixes, or cross-reference resolution.
 - **Browser print engines vary.** Column balancing, `break-inside`, and `column-span` support differ between Chromium, Firefox, and Safari. Direct `.pdf` output uses Puppeteer/Chromium for a more stable export path.
 - **Advanced float placement and true page-bottom footnotes are out of scope.** Figures print where they occur, and footnotes collect at the end of the document.
 

@@ -41,6 +41,14 @@ import remarkImageFigures from './transforms/figures.js'
 import remarkFigureDirective from './transforms/figureDirective.js'
 import remarkVideoDirective from './transforms/videoDirective.js'
 import sanitizeSchema from './transforms/sanitizeSchema.js'
+import {
+  applyCitationHtml,
+  createCitationState,
+  remarkCitations,
+  renderCitations,
+  type CitationOptions,
+  type CitationState
+} from './citations.js'
 
 export interface ConvertOptions {
   /** How the stylesheet is delivered. Defaults to linking `paperify.css`. */
@@ -51,6 +59,8 @@ export interface ConvertOptions {
   title?: string
   /** Override the document language. Defaults to frontmatter lang, then "en". */
   lang?: string
+  /** BibTeX/CSL inputs used to resolve Markdown citations like [@key]. */
+  citations?: CitationOptions
 }
 
 export interface ConvertResult {
@@ -66,7 +76,11 @@ export interface ConvertResult {
   warnings: string[]
 }
 
-function buildProcessor(options: ConvertOptions, assets: string[]) {
+function buildProcessor(
+  options: ConvertOptions,
+  assets: string[],
+  citationState?: CitationState
+) {
   let processor: Processor<any, any, any, any, any> = unified()
     .use(remarkParse)
     .use(remarkGfm)
@@ -75,6 +89,12 @@ function buildProcessor(options: ConvertOptions, assets: string[]) {
     .use(remarkFigureDirective)
     .use(remarkVideoDirective)
     .use(remarkImageFigures)
+
+  if (citationState) {
+    processor = processor.use(remarkCitations(citationState))
+  }
+
+  processor = processor
     .use(remarkRehype, { allowDangerousHtml: Boolean(options.unsafeHtml) })
 
   if (options.unsafeHtml) {
@@ -96,18 +116,36 @@ export async function convert(
 ): Promise<ConvertResult> {
   const { content, meta } = parseFrontmatter(markdown)
   const assets: string[] = []
+  const lang = options.lang ?? meta.lang ?? 'en'
+  const citationState = options.citations
+    ? createCitationState({
+        ...options.citations,
+        locale: options.citations.locale ?? lang
+      })
+    : undefined
 
-  const processor = buildProcessor(options, assets)
+  const processor = buildProcessor(options, assets, citationState)
   const file = await processor.process(content)
-  const contentHtml = String(file).trim()
+  let contentHtml = String(file).trim()
 
   const warnings = file.messages.map((m) => m.reason)
+
+  if (citationState) {
+    const rendered = renderCitations(citationState)
+    contentHtml = applyCitationHtml(
+      contentHtml,
+      citationState,
+      rendered.citations
+    )
+    if (rendered.bibliographyHtml) {
+      contentHtml = `${contentHtml}\n${rendered.bibliographyHtml}`
+    }
+  }
 
   const effectiveMeta: PaperMeta = {
     ...meta,
     title: options.title ?? meta.title
   }
-  const lang = options.lang ?? meta.lang ?? 'en'
   const css: CssMode = options.css ?? { mode: 'link', href: 'paperify.css' }
   const hasMath = /class="[^"]*katex/.test(contentHtml)
 

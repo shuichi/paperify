@@ -32,7 +32,8 @@ footerTemplate: |
 
 Academic writing tools tend to cluster at two extremes: heavyweight LaTeX
 toolchains with excellent print output, and web-first Markdown renderers
-with no print story at all. Paperify sits deliberately between them[^1].
+with no print story at all. Paperify sits deliberately between them, taking
+some inspiration from Pandoc's document conversion model [@macfarlane2006pandoc][^1].
 The authoring format is plain Markdown, the output is a single portable
 HTML file, and the _same_ document reads comfortably on a phone and
 prints as a two-column paper.
@@ -83,7 +84,8 @@ output size. Values are the median of ten runs.
 | Baseline A |             410 |              212 | single       |
 | Baseline B |           2,930 |              188 | two-column   |
 
-The conversion pipeline itself is short. The core of it looks like this:
+The conversion pipeline itself is short and builds on unified's structured
+content model [@unified2015unified]. The core of it looks like this:
 
 ```ts
 const processor = unified()
@@ -106,8 +108,10 @@ const processor = unified()
 
 Two-column print layout in browsers is imperfect: column balancing and
 break control vary by engine[^2]. Paperify accepts this trade-off in
-exchange for a zero-install toolchain. Advanced float placement and true
-page-bottom footnotes are explicitly out of scope for v1.
+exchange for a zero-install toolchain. It borrows some typographic discipline
+from TeX-era publishing without trying to become TeX [@knuth1984texbook].
+Advanced float placement and true page-bottom footnotes are explicitly out
+of scope for v1.
 
 ## Conclusion
 
@@ -122,9 +126,3 @@ stays small; the CSS carries the craft.
 [^2]:
     Chromium generally produces the most predictable multi-column
     print output at the time of writing.
-
-## References
-
-1. MacFarlane, J. _Pandoc: a universal document converter._ 2006–2026.
-2. The unified collective. _unified: content as structured data._ 2015–2026.
-3. Knuth, D. E. _The TeXbook._ Addison-Wesley, 1984.

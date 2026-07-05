@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -8,12 +9,18 @@ import { parseFrontmatter } from '../src/frontmatter.js'
 import { inferVideoType } from '../src/transforms/videoDirective.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
+const require = createRequire(import.meta.url)
 const fixture = (name: string): string =>
   fs.readFileSync(path.join(here, 'fixtures', name), 'utf8')
 const css = fs.readFileSync(
   path.join(here, '..', 'styles', 'paperify.css'),
   'utf8'
 )
+const cslStyles = require('@citation-js/plugin-csl/lib/styles.json') as Record<
+  string,
+  string
+>
+const apaCsl = cslStyles.apa
 
 describe('frontmatter parsing', () => {
   it('parses and normalizes all standard fields', () => {
@@ -134,6 +141,59 @@ describe('math rendering', () => {
   it('omits the KaTeX stylesheet when the document has no math', async () => {
     const { html } = await convert('# No math here\n')
     expect(html).not.toContain('katex.min.css')
+  })
+})
+
+describe('citations', () => {
+  const bibtex = [
+    '@book{knuth1984texbook,',
+    '  author = {Knuth, Donald E.},',
+    '  title = {The TeXbook},',
+    '  publisher = {Addison-Wesley},',
+    '  year = {1984}',
+    '}',
+    '',
+    '@book{lamport1994latex,',
+    '  author = {Lamport, Leslie},',
+    '  title = {LaTeX: A Document Preparation System},',
+    '  publisher = {Addison-Wesley},',
+    '  year = {1994}',
+    '}'
+  ].join('\n')
+
+  it('resolves BibTeX citation keys and appends a bibliography', async () => {
+    const { contentHtml } = await convert('See [@knuth1984texbook].\n', {
+      citations: { bibtex, cslXml: apaCsl }
+    })
+
+    expect(contentHtml).toContain(
+      '<span class="citation" data-cites="knuth1984texbook">'
+    )
+    expect(contentHtml).toContain('(Knuth, 1984)')
+    expect(contentHtml).toContain('<section class="paper-references" id="references">')
+    expect(contentHtml).toContain('class="csl-entry"')
+    expect(contentHtml).toContain('The TeXbook')
+  })
+
+  it('supports multiple keys in one citation cluster', async () => {
+    const { contentHtml } = await convert(
+      'Compare [@knuth1984texbook; @lamport1994latex].\n',
+      { citations: { bibtex, cslXml: apaCsl } }
+    )
+
+    expect(contentHtml).toContain(
+      'data-cites="knuth1984texbook lamport1994latex"'
+    )
+    expect(contentHtml).toContain('Knuth, 1984')
+    expect(contentHtml).toContain('Lamport, 1994')
+  })
+
+  it('fails clearly for unknown citation keys', async () => {
+    await expect(
+      convert('Missing [@missing].\n', {
+        citations: { bibtex, cslXml: apaCsl }
+      })
+    ).rejects.toThrow('Citation key not found in BibTeX: missing')
   })
 })
 

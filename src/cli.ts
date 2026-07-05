@@ -18,6 +18,7 @@ import { compileHtml } from './compile.js'
 import { renderPdf } from './pdf.js'
 import { readStyleBundle, resolveCssPaths } from './styleSources.js'
 import type { CssMode } from './template.js'
+import { DEFAULT_CSL_STYLE, fetchCslStyle } from './csl.js'
 
 const HELP = `paperify — CSS-first academic Markdown-to-HTML publishing
 
@@ -30,6 +31,10 @@ Options:
   --css <file>          Custom CSS file path (default: bundled paperify.css)
   --fontset <name>      Add bundled font CSS after the base stylesheet
                         (for example: japanese)
+  --bib, --bibliography <file>
+                        BibTeX bibliography file (default: <input>.bib when present)
+  --csl <id>            Zotero Style Repository CSL style ID
+                        (default: computing-surveys)
   --embed-css           Compatibility option; compiled HTML always embeds CSS
   --unsafe-html         Allow sanitized raw HTML inside Markdown
   --title <title>       Override title from frontmatter
@@ -52,6 +57,8 @@ interface CliOptions {
   output: string
   cssFile?: string
   fontset?: string
+  bibFile?: string
+  cslStyle: string
   embedCss: boolean
   unsafeHtml: boolean
   title?: string
@@ -68,6 +75,8 @@ function parseArgs(argv: string[]): CliOptions | 'help' {
   let output: string | undefined
   let cssFile: string | undefined
   let fontset: string | undefined
+  let bibFile: string | undefined
+  let cslStyle = DEFAULT_CSL_STYLE
   let embedCss = false
   let unsafeHtml = false
   let title: string | undefined
@@ -101,6 +110,15 @@ function parseArgs(argv: string[]): CliOptions | 'help' {
         break
       case '--fontset':
         fontset = takeValue(arg, i)
+        i++
+        break
+      case '--bib':
+      case '--bibliography':
+        bibFile = takeValue(arg, i)
+        i++
+        break
+      case '--csl':
+        cslStyle = takeValue(arg, i)
         i++
         break
       case '--embed-css':
@@ -155,6 +173,8 @@ function parseArgs(argv: string[]): CliOptions | 'help' {
     output: resolvedOutput,
     cssFile,
     fontset,
+    bibFile,
+    cslStyle,
     embedCss,
     unsafeHtml,
     title,
@@ -175,6 +195,18 @@ function compiledHtmlPathForOutput(output: string): string {
   return path.join(parsed.dir, `${parsed.name}.html`)
 }
 
+function defaultBibPathForInput(input: string): string {
+  const parsed = path.parse(input)
+  return path.join(parsed.dir, `${parsed.name}.bib`)
+}
+
+function resolveBibPath(options: CliOptions): string | undefined {
+  if (options.bibFile) return path.resolve(options.bibFile)
+
+  const candidate = path.resolve(defaultBibPathForInput(options.input))
+  return fs.existsSync(candidate) ? candidate : undefined
+}
+
 async function buildOnce(options: CliOptions): Promise<void> {
   if (!fs.existsSync(options.input)) {
     throw new CliError(`Input file not found: ${options.input}`)
@@ -184,6 +216,21 @@ async function buildOnce(options: CliOptions): Promise<void> {
   const styleBundle = readStyleBundle(options)
   const outputIsPdf = isPdfOutput(options.output)
   const inputDir = path.dirname(path.resolve(options.input))
+  const bibPath = resolveBibPath(options)
+  let citations:
+    | { bibtex: string; cslXml: string; styleId: string }
+    | undefined
+
+  if (bibPath) {
+    if (!fs.existsSync(bibPath)) {
+      throw new CliError(`BibTeX file not found: ${bibPath}`)
+    }
+    citations = {
+      bibtex: fs.readFileSync(bibPath, 'utf8'),
+      cslXml: await fetchCslStyle(options.cslStyle),
+      styleId: options.cslStyle
+    }
+  }
 
   const css: CssMode = { mode: 'embed', content: styleBundle.content }
 
@@ -191,7 +238,8 @@ async function buildOnce(options: CliOptions): Promise<void> {
     css,
     unsafeHtml: options.unsafeHtml,
     title: options.title,
-    lang: options.lang
+    lang: options.lang,
+    citations
   })
 
   const outputDir = path.dirname(path.resolve(options.output))
@@ -241,6 +289,8 @@ async function buildOnce(options: CliOptions): Promise<void> {
 function watchAndRebuild(options: CliOptions): void {
   const targets = new Set<string>([path.resolve(options.input)])
   for (const cssPath of resolveCssPaths(options)) targets.add(cssPath)
+  const bibPath = resolveBibPath(options)
+  if (bibPath) targets.add(bibPath)
 
   let timer: NodeJS.Timeout | undefined
   const rebuild = () => {

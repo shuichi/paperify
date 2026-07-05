@@ -540,13 +540,61 @@ hr {
 }
 
 /* --------------------------------------------------------------------------
-   13. Utility visibility classes
+   13. Citations & references
+   -------------------------------------------------------------------------- */
+
+.paper-content .citation {
+  white-space: nowrap;
+}
+
+.paper-content .paper-references {
+  margin-top: 3rem;
+  border-top: 1px solid var(--rule-color);
+  padding-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.paper-content .paper-references h2 {
+  margin-top: 0;
+}
+
+.paper-content .csl-bib-body {
+  margin-top: 0.75em;
+}
+
+.paper-content .csl-entry {
+  margin-bottom: 0.55em;
+  padding-left: 1.5em;
+  text-indent: -1.5em;
+}
+
+.paper-content .csl-second-field-align .csl-entry {
+  padding-left: 0;
+  text-indent: 0;
+}
+
+.paper-content .csl-left-margin {
+  float: left;
+  width: 2.4em;
+  padding-right: 0.5em;
+  text-indent: 0;
+  text-align: right;
+}
+
+.paper-content .csl-right-inline {
+  display: block;
+  padding-left: 2.4em;
+  text-indent: 0;
+}
+
+/* --------------------------------------------------------------------------
+   14. Utility visibility classes
    -------------------------------------------------------------------------- */
 
 .print-only { display: none; }
 
 /* --------------------------------------------------------------------------
-   14. Small screens
+   15. Small screens
    -------------------------------------------------------------------------- */
 
 @media (max-width: 480px) {
@@ -568,7 +616,7 @@ hr {
 }
 
 /* ==========================================================================
-   15. PRINT — two-column A4 academic paper
+   16. PRINT — two-column A4 academic paper
    ==========================================================================
    The front matter (title, authors, abstract, keywords) stays single
    column; `.paper-content` flows into two columns. Break control keeps
@@ -685,6 +733,7 @@ hr {
   .paper-content table,
   .paper-content pre,
   .paper-content blockquote,
+  .paper-content .csl-entry,
   .katex-display {
     break-inside: avoid;
     page-break-inside: avoid;    /* legacy engines */
@@ -819,6 +868,21 @@ hr {
   /* Footnote refs/backrefs keep their marker styling but no color. */
   .paper-content .footnotes {
     font-size: 7.5pt;
+  }
+
+  .paper-content .paper-references {
+    margin-top: 6mm;
+    padding-top: 3mm;
+    font-size: 8pt;
+    text-align: left;
+  }
+
+  .paper-content .paper-references h2 {
+    font-size: 11pt;
+  }
+
+  .paper-content .citation {
+    white-space: normal;
   }
 
   .paper-content a[data-footnote-backref] {
