@@ -20,6 +20,12 @@ keywords:
   - HTML
   - CSS
   - academic publishing
+headerTemplate: |
+  <div style="font-family:'Noto Sans JP', sans-serif;font-size:8px;width:100%;text-align:center"></div>
+footerTemplate: |
+  <div style="font-family:'Noto Sans JP', sans-serif;font-size:8px;width:100%;text-align:center">
+    <span class="pageNumber"></span>/<span class="totalPages"></span>
+  </div>
 ---
 
 ## Introduction
@@ -28,7 +34,7 @@ Academic writing tools tend to cluster at two extremes: heavyweight LaTeX
 toolchains with excellent print output, and web-first Markdown renderers
 with no print story at all. Paperify sits deliberately between them[^1].
 The authoring format is plain Markdown, the output is a single portable
-HTML file, and the *same* document reads comfortably on a phone and
+HTML file, and the _same_ document reads comfortably on a phone and
 prints as a two-column paper.
 
 The design philosophy is simple: keep the HTML semantic and stable, and
@@ -71,11 +77,11 @@ in print the poster frame is shown with a readable source link:
 We compare Paperify against two baselines on document build time and
 output size. Values are the median of ten runs.
 
-| System        | Build time (ms) | Output size (KB) | Print layout |
-| ------------- | --------------: | ---------------: | :----------- |
-| Paperify      |              84 |               46 | two-column   |
-| Baseline A    |             410 |              212 | single       |
-| Baseline B    |           2,930 |              188 | two-column   |
+| System     | Build time (ms) | Output size (KB) | Print layout |
+| ---------- | --------------: | ---------------: | :----------- |
+| Paperify   |              84 |               46 | two-column   |
+| Baseline A |             410 |              212 | single       |
+| Baseline B |           2,930 |              188 | two-column   |
 
 The conversion pipeline itself is short. The core of it looks like this:
 
@@ -88,7 +94,7 @@ const processor = unified()
   .use(paperifyTransforms)
   .use(remarkRehype)
   .use(rehypeKatex)
-  .use(rehypeStringify)
+  .use(rehypeStringify);
 ```
 
 > Design note: every feature in this paper — math, figures, tables,
@@ -108,14 +114,16 @@ Paperify shows that a Markdown pipeline plus one disciplined stylesheet
 is enough for readable, printable academic documents. The converter
 stays small; the CSS carries the craft.
 
-[^1]: The name follows the convention of verb-ifying nouns, which we
+[^1]:
+    The name follows the convention of verb-ifying nouns, which we
     neither endorse nor apologize for.
 
-[^2]: Chromium generally produces the most predictable multi-column
+[^2]:
+    Chromium generally produces the most predictable multi-column
     print output at the time of writing.
 
 ## References
 
-1. MacFarlane, J. *Pandoc: a universal document converter.* 2006–2026.
-2. The unified collective. *unified: content as structured data.* 2015–2026.
-3. Knuth, D. E. *The TeXbook.* Addison-Wesley, 1984.
+1. MacFarlane, J. _Pandoc: a universal document converter._ 2006–2026.
+2. The unified collective. _unified: content as structured data._ 2015–2026.
+3. Knuth, D. E. _The TeXbook._ Addison-Wesley, 1984.

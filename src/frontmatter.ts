@@ -22,6 +22,8 @@ export interface PaperMeta {
   abstract?: string
   keywords: string[]
   lang?: string
+  headerTemplate?: string
+  footerTemplate?: string
 }
 
 export interface FrontmatterResult {
@@ -102,7 +104,9 @@ export function parseFrontmatter(source: string): FrontmatterResult {
     date: asString(data.date),
     abstract: asString(data.abstract),
     keywords: normalizeKeywords(data.keywords),
-    lang: asString(data.lang ?? data.language)
+    lang: asString(data.lang ?? data.language),
+    headerTemplate: asString(data.headerTemplate),
+    footerTemplate: asString(data.footerTemplate)
   }
 
   return { content: parsed.content, meta }

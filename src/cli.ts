@@ -11,12 +11,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
-import { fileURLToPath } from 'node:url'
 
 import { convert } from './convert.js'
 import { copyAssets } from './assets.js'
 import { compileHtml } from './compile.js'
 import { renderPdf } from './pdf.js'
+import { readStyleBundle, resolveCssPaths } from './styleSources.js'
 import type { CssMode } from './template.js'
 
 const HELP = `paperify — CSS-first academic Markdown-to-HTML publishing
@@ -28,6 +28,8 @@ Options:
   --output, -o <file>   Compile to this path; .pdf also writes sibling .html
                         (default: <input>.html)
   --css <file>          Custom CSS file path (default: bundled paperify.css)
+  --fontset <name>      Add bundled font CSS after the base stylesheet
+                        (for example: japanese)
   --embed-css           Compatibility option; compiled HTML always embeds CSS
   --unsafe-html         Allow sanitized raw HTML inside Markdown
   --title <title>       Override title from frontmatter
@@ -41,6 +43,7 @@ Options:
 Examples:
   paperify paper.md -o dist/paper.html
   paperify paper.md -o dist/paper.pdf
+  paperify paper.md --fontset japanese -o dist/paper.pdf
   paperify paper.md --css mytheme.css --watch
 `
 
@@ -48,6 +51,7 @@ interface CliOptions {
   input: string
   output: string
   cssFile?: string
+  fontset?: string
   embedCss: boolean
   unsafeHtml: boolean
   title?: string
@@ -63,6 +67,7 @@ function parseArgs(argv: string[]): CliOptions | 'help' {
   const positional: string[] = []
   let output: string | undefined
   let cssFile: string | undefined
+  let fontset: string | undefined
   let embedCss = false
   let unsafeHtml = false
   let title: string | undefined
@@ -92,6 +97,10 @@ function parseArgs(argv: string[]): CliOptions | 'help' {
         break
       case '--css':
         cssFile = takeValue(arg, i)
+        i++
+        break
+      case '--fontset':
+        fontset = takeValue(arg, i)
         i++
         break
       case '--embed-css':
@@ -145,6 +154,7 @@ function parseArgs(argv: string[]): CliOptions | 'help' {
     input,
     output: resolvedOutput,
     cssFile,
+    fontset,
     embedCss,
     unsafeHtml,
     title,
@@ -153,22 +163,6 @@ function parseArgs(argv: string[]): CliOptions | 'help' {
     watch,
     copyAssets: copy
   }
-}
-
-/** Locate the stylesheet bundled with the package (styles/paperify.css). */
-function defaultCssPath(): string {
-  const here = path.dirname(fileURLToPath(import.meta.url))
-  return path.resolve(here, '..', 'styles', 'paperify.css')
-}
-
-function resolveCssSource(options: CliOptions): string {
-  const cssPath = options.cssFile
-    ? path.resolve(options.cssFile)
-    : defaultCssPath()
-  if (!fs.existsSync(cssPath)) {
-    throw new CliError(`CSS file not found: ${cssPath}`)
-  }
-  return cssPath
 }
 
 function isPdfOutput(output: string): boolean {
@@ -187,11 +181,11 @@ async function buildOnce(options: CliOptions): Promise<void> {
   }
 
   const markdown = fs.readFileSync(options.input, 'utf8')
-  const cssPath = resolveCssSource(options)
+  const styleBundle = readStyleBundle(options)
   const outputIsPdf = isPdfOutput(options.output)
   const inputDir = path.dirname(path.resolve(options.input))
 
-  const css: CssMode = { mode: 'embed', content: fs.readFileSync(cssPath, 'utf8') }
+  const css: CssMode = { mode: 'embed', content: styleBundle.content }
 
   const result = await convert(markdown, {
     css,
@@ -218,7 +212,9 @@ async function buildOnce(options: CliOptions): Promise<void> {
       outputPath: path.resolve(options.output),
       browserExecutablePath: options.browserExecutable
         ? path.resolve(options.browserExecutable)
-        : undefined
+        : undefined,
+      headerTemplate: result.meta.headerTemplate,
+      footerTemplate: result.meta.footerTemplate
     })
   }
 
@@ -244,7 +240,7 @@ async function buildOnce(options: CliOptions): Promise<void> {
 
 function watchAndRebuild(options: CliOptions): void {
   const targets = new Set<string>([path.resolve(options.input)])
-  if (options.cssFile) targets.add(path.resolve(options.cssFile))
+  for (const cssPath of resolveCssPaths(options)) targets.add(cssPath)
 
   let timer: NodeJS.Timeout | undefined
   const rebuild = () => {

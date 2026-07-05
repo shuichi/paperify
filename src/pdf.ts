@@ -17,6 +17,10 @@ export interface RenderPdfOptions {
   outputPath: string
   /** Optional Chromium/Chrome executable path for Puppeteer. */
   browserExecutablePath?: string
+  /** Puppeteer HTML template for the print header. */
+  headerTemplate?: string
+  /** Puppeteer HTML template for the print footer. */
+  footerTemplate?: string
 }
 
 function asPdfError(error: unknown): Error {
@@ -36,6 +40,24 @@ function asPdfError(error: unknown): Error {
   return error instanceof Error ? error : new Error(message)
 }
 
+export function buildPdfOptions(options: RenderPdfOptions): PDFOptions {
+  const hasHeaderFooter = Boolean(options.headerTemplate || options.footerTemplate)
+  const pdfOptions: PDFOptions = {
+    path: options.outputPath,
+    printBackground: true,
+    preferCSSPageSize: true,
+    waitForFonts: true
+  }
+
+  if (hasHeaderFooter) {
+    pdfOptions.displayHeaderFooter = true
+    pdfOptions.headerTemplate = options.headerTemplate ?? ''
+    pdfOptions.footerTemplate = options.footerTemplate ?? ''
+  }
+
+  return pdfOptions
+}
+
 export async function renderPdf(options: RenderPdfOptions): Promise<void> {
   try {
     const { default: puppeteer } = await import('puppeteer')
@@ -52,13 +74,7 @@ export async function renderPdf(options: RenderPdfOptions): Promise<void> {
       await page.waitForNetworkIdle({ idleTime: 500, timeout: 30_000 })
       await page.bringToFront()
 
-      const pdfOptions: PDFOptions = {
-        path: options.outputPath,
-        printBackground: true,
-        preferCSSPageSize: true,
-        waitForFonts: true
-      }
-      await page.pdf(pdfOptions)
+      await page.pdf(buildPdfOptions(options))
     } finally {
       await browser.close()
     }

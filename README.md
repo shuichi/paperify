@@ -26,6 +26,7 @@ To use the CLI from anywhere:
 npm install -g .     # or: npm link
 paperify input.md -o output.html
 paperify input.md -o output.pdf
+paperify input.md --fontset japanese -o output.pdf
 ```
 
 ## CLI usage
@@ -36,6 +37,8 @@ paperify <input.md> [options]
 --output, -o <file>   Compile to this path; .pdf also writes sibling .html
                       (default: <input>.html)
 --css <file>          Custom CSS file path (default: bundled paperify.css)
+--fontset <name>      Add bundled font CSS after the base stylesheet
+                      (for example: japanese)
 --embed-css           Compatibility option; compiled HTML always embeds CSS
 --unsafe-html         Allow sanitized raw HTML inside Markdown
 --title <title>       Override title from frontmatter
@@ -74,10 +77,14 @@ keywords:
   - Markdown
   - academic publishing
 lang: en
+footerTemplate: |
+  <div style="font-size:8px;width:100%;text-align:center">
+    <span class="pageNumber"></span>/<span class="totalPages"></span>
+  </div>
 ---
 ```
 
-All fields are optional. Authors may also be plain strings, and keywords may be a comma-separated string. Everything is normalized and HTML-escaped before rendering.
+All fields are optional. Authors may also be plain strings, and keywords may be a comma-separated string. Regular document metadata is normalized and HTML-escaped before rendering. `headerTemplate` and `footerTemplate` are used only for direct PDF output and are passed through as Puppeteer header/footer HTML templates.
 
 ### Math
 
@@ -156,6 +163,24 @@ paperify paper.md -o paper.pdf
 
 Paperify uses Puppeteer to open the compiled HTML file and print with Chromium's `print` media type, `preferCSSPageSize`, and background graphics enabled. The stylesheet's `@page` rule controls the A4 page size and margins.
 
+PDF headers and footers can be controlled from YAML frontmatter:
+
+```yaml
+---
+title: "Paper Title"
+headerTemplate: |
+  <div style="font-size:8px;width:100%;padding:0 12mm">
+    <span class="title"></span>
+  </div>
+footerTemplate: |
+  <div style="font-size:8px;width:100%;text-align:center">
+    <span class="pageNumber"></span>/<span class="totalPages"></span>
+  </div>
+---
+```
+
+Puppeteer fills special spans by class name: `date`, `title`, `url`, `pageNumber`, and `totalPages`. Header/footer templates are rendered in Puppeteer's print margin area, so put any needed styling inline or inside a `<style>` tag in the template.
+
 If Puppeteer cannot find or launch its managed browser, install it with `npx puppeteer browsers install chrome`, or point Paperify at an existing Chrome/Chromium binary:
 
 ```bash
@@ -179,6 +204,7 @@ The stylesheet is the deliverable that does the visual work — the HTML is inte
 Options for theming:
 
 - **Override variables** in a small stylesheet loaded after `paperify.css`.
+- **Use a bundled fontset** with `--fontset japanese`; Paperify loads `styles/paperify.css` first, then `styles/fontset/japanese.css`.
 - **Pass your own stylesheet** with `--css mytheme.css` (start from a copy of `styles/paperify.css`).
 - Print-specific knobs (`--print-body-size`, `--print-line-height`, `--print-column-gap`) live in the same `:root` block.
 

@@ -53,6 +53,26 @@ describe('frontmatter parsing', () => {
     const { meta } = parseFrontmatter(src)
     expect(meta.date).toBe('2026-07-04')
   })
+
+  it('preserves PDF header and footer templates', () => {
+    const src = [
+      '---',
+      'headerTemplate: |',
+      '  <div style="font-size:8px"><span class="title"></span></div>',
+      'footerTemplate: |',
+      '  <div style="font-size:8px">',
+      '    <span class="pageNumber"></span>/<span class="totalPages"></span>',
+      '  </div>',
+      '---',
+      'text'
+    ].join('\n')
+    const { meta } = parseFrontmatter(src)
+    expect(meta.headerTemplate).toBe(
+      '<div style="font-size:8px"><span class="title"></span></div>'
+    )
+    expect(meta.footerTemplate).toContain('class="pageNumber"')
+    expect(meta.footerTemplate).toContain('class="totalPages"')
+  })
 })
 
 describe('basic Markdown conversion', () => {
