@@ -46,6 +46,16 @@
   --page-bg: #fff;
   --code-bg: #f6f6f4;
 
+  /* Syntax highlighting */
+  --syntax-comment: #656d76;
+  --syntax-keyword: #7a3e9d;
+  --syntax-string: #116329;
+  --syntax-number: #8a4600;
+  --syntax-title: #0550ae;
+  --syntax-meta: #8250df;
+  --syntax-deletion-bg: #ffebe9;
+  --syntax-addition-bg: #dafbe1;
+
   /* Print knobs (used inside @media print below) */
   --print-body-size: 9.5pt;
   --print-line-height: 1.45;
@@ -294,8 +304,8 @@ hr {
 /* --------------------------------------------------------------------------
    8. Code
    --------------------------------------------------------------------------
-   No syntax highlighting in v1, but `code.language-*` classes are kept in
-   the HTML so a highlighter (or a theme) can hook in later.
+   Fenced code blocks are highlighted at build time from their language tag,
+   for example ```ts. Unlabeled blocks remain plain text.
    -------------------------------------------------------------------------- */
 
 .paper-content code {
@@ -321,6 +331,68 @@ hr {
   border-radius: 0;
   padding: 0;
   font-size: 0.85em;
+}
+
+.paper-content pre code.hljs {
+  color: var(--text-color);
+}
+
+.paper-content .hljs-comment,
+.paper-content .hljs-quote {
+  color: var(--syntax-comment);
+  font-style: italic;
+}
+
+.paper-content .hljs-keyword,
+.paper-content .hljs-selector-tag,
+.paper-content .hljs-subst {
+  color: var(--syntax-keyword);
+}
+
+.paper-content .hljs-string,
+.paper-content .hljs-attr,
+.paper-content .hljs-symbol,
+.paper-content .hljs-bullet {
+  color: var(--syntax-string);
+}
+
+.paper-content .hljs-number,
+.paper-content .hljs-literal,
+.paper-content .hljs-variable,
+.paper-content .hljs-template-variable {
+  color: var(--syntax-number);
+}
+
+.paper-content .hljs-title,
+.paper-content .hljs-section,
+.paper-content .hljs-name,
+.paper-content .hljs-selector-id,
+.paper-content .hljs-selector-class {
+  color: var(--syntax-title);
+}
+
+.paper-content .hljs-type,
+.paper-content .hljs-built_in,
+.paper-content .hljs-builtin-name,
+.paper-content .hljs-meta,
+.paper-content .hljs-doctag {
+  color: var(--syntax-meta);
+}
+
+.paper-content .hljs-emphasis {
+  font-style: italic;
+}
+
+.paper-content .hljs-strong {
+  font-weight: 600;
+}
+
+.paper-content .hljs-deletion {
+  background: var(--syntax-deletion-bg);
+}
+
+.paper-content .hljs-addition {
+  background: var(--syntax-addition-bg);
 }
 
 /* --------------------------------------------------------------------------

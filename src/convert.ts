@@ -13,6 +13,7 @@
  *   rehype-raw         only with --unsafe-html
  *   rehype-sanitize    only with --unsafe-html (allowlist schema)
  *   rehype-katex       static, build-time math rendering
+ *   rehype-highlight   static, build-time syntax highlighting
  *   rehype-slug        stable heading IDs
  *   rehype-stringify   hast → HTML fragment
  *
@@ -29,6 +30,7 @@ import remarkRehype from 'remark-rehype'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize from 'rehype-sanitize'
 import rehypeKatex from 'rehype-katex'
+import rehypeHighlight from 'rehype-highlight'
 import rehypeSlug from 'rehype-slug'
 import rehypeStringify from 'rehype-stringify'
 
@@ -81,6 +83,7 @@ function buildProcessor(options: ConvertOptions, assets: string[]) {
 
   return processor
     .use(rehypeKatex)
+    .use(rehypeHighlight, { detect: false })
     .use(rehypeSlug)
     .use(collectAssets, { assets })
     .use(rehypeStringify)

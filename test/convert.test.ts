@@ -101,6 +101,19 @@ describe('basic Markdown conversion', () => {
     expect(contentHtml).toContain('class="footnotes"')
     expect(contentHtml).toContain('data-footnote-ref')
   })
+
+  it('highlights fenced code blocks from their language tag', async () => {
+    const highlighted = await convert('```ts\nconst answer: number = 42\n```\n')
+    expect(highlighted.contentHtml).toContain(
+      '<code class="hljs language-ts">'
+    )
+    expect(highlighted.contentHtml).toContain('hljs-keyword')
+    expect(highlighted.contentHtml).toContain('hljs-number')
+
+    const plain = await convert('```\nconst answer = 42\n```\n')
+    expect(plain.contentHtml).toContain('<pre><code>const answer = 42')
+    expect(plain.contentHtml).not.toContain('hljs')
+  })
 })
 
 describe('math rendering', () => {
@@ -266,10 +279,23 @@ describe('stylesheet', () => {
       '--text-color',
       '--muted-color',
       '--rule-color',
-      '--accent-color'
+      '--accent-color',
+      '--syntax-keyword',
+      '--syntax-string'
     ]) {
       expect(css).toContain(v)
     }
+  })
+
+  it('styles highlight.js token classes', () => {
+    expect(css).toContain('.paper-content pre code.hljs')
+    expect(css).toContain('.paper-content .hljs-keyword')
+    expect(css).toContain('.paper-content .hljs-string')
+  })
+
+  it('does not override syntax colors in print styles', () => {
+    const printCss = css.slice(css.lastIndexOf('@media print {'))
+    expect(printCss).not.toContain('--syntax-')
   })
 })
 

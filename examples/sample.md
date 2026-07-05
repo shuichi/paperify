@@ -94,6 +94,7 @@ const processor = unified()
   .use(paperifyTransforms)
   .use(remarkRehype)
   .use(rehypeKatex)
+  .use(rehypeHighlight, { detect: false })
   .use(rehypeStringify);
 ```
 

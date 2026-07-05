@@ -132,7 +132,7 @@ Supported attributes: `src` (required), `poster`, `caption`, `controls` (default
 ### Tables, code, footnotes, blockquotes
 
 - **Tables** use GFM syntax and booktabs-style thin rules. On screen, wide tables scroll horizontally; in print they are kept inside a column and protected from breaking where possible.
-- **Code blocks** are fenced. There is no syntax highlighting in v1, but the `language-*` class is preserved on the `<code>` element so a highlighter or theme can hook in later. In print, code wraps rather than clipping.
+- **Code blocks** are fenced and highlighted at build time from their language tag, such as a `ts` fence. Unlabeled blocks remain plain text. In print, code wraps rather than clipping.
 - **Footnotes** use GFM syntax (`[^1]`) and render compactly at the end of the document. True page-bottom footnotes are out of scope for v1.
 - **Blockquotes** render as restrained academic notes with a thin left rule.
 

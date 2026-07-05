@@ -37,6 +37,7 @@
     "katex": "^0.17.0",
     "mdast-util-directive": "^3.1.0",
     "puppeteer": "^25.3.0",
+    "rehype-highlight": "^7.0.2",
     "rehype-katex": "^7.0.1",
     "rehype-raw": "^7.0.0",
     "rehype-sanitize": "^6.0.0",
