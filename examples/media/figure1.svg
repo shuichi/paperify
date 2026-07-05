@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="220" viewBox="0 0 560 220">
+  <rect width="560" height="220" fill="#fafafa" stroke="#ddd"/>
+  <g font-family="system-ui, sans-serif" font-size="14" fill="#111" text-anchor="middle">
+    <rect x="30" y="85" width="110" height="50" fill="#fff" stroke="#111" stroke-width="1.5"/>
+    <text x="85" y="115">Markdown</text>
+    <rect x="200" y="85" width="110" height="50" fill="#fff" stroke="#111" stroke-width="1.5"/>
+    <text x="255" y="108">remark /</text>
+    <text x="255" y="126">rehype</text>
+    <rect x="370" y="85" width="110" height="50" fill="#fff" stroke="#111" stroke-width="1.5"/>
+    <text x="425" y="115">HTML</text>
+  </g>
+  <g stroke="#111" stroke-width="1.5" fill="#111">
+    <line x1="140" y1="110" x2="192" y2="110"/>
+    <path d="M192 105 L202 110 L192 115 Z"/>
+    <line x1="310" y1="110" x2="362" y2="110"/>
+    <path d="M362 105 L372 110 L362 115 Z"/>
+  </g>
+  <text x="280" y="185" font-family="system-ui, sans-serif" font-size="13" fill="#666" text-anchor="middle">paperify.css styles the result for screen and print</text>
+</svg>
