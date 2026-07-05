@@ -6,7 +6,7 @@
 
 **CSS-first academic publishing: Markdown in, one portable HTML file out — readable on screen, printable as a two-column paper.**
 
-Paperify is a lightweight Markdown-to-HTML converter for academic writing. It is deliberately *not* a LaTeX clone. The converter stays small and emits minimal, semantic HTML; a carefully authored stylesheet (`paperify.css`) carries the layout and typography for both media:
+Paperify is a lightweight Markdown-to-HTML converter for academic writing. It is deliberately _not_ a LaTeX clone. The converter stays small and emits minimal, semantic HTML; a carefully authored stylesheet (`paperify.css`) carries the layout and typography for both media:
 
 - **Screen** — a single, centered reading column that is comfortable on desktop and mobile.
 - **Print / PDF** — a two-column A4 academic paper, produced by the browser's own print engine. The title, authors, abstract, and keywords stay single-column; the article body flows into two columns with careful break control.
@@ -109,7 +109,7 @@ A paragraph containing only an image becomes a semantic figure, with the alt tex
 
 ```html
 <figure class="image-figure">
-  <img src="images/figure1.png" alt="Caption text">
+  <img src="images/figure1.png" alt="Caption text" />
   <figcaption>Caption text</figcaption>
 </figure>
 ```
@@ -146,14 +146,14 @@ Raw HTML is **disabled by default** — unknown HTML in the source is dropped. W
 
 ## Screen vs. print behavior
 
-| Aspect | Screen | Print |
-| --- | --- | --- |
-| Layout | single centered column (~78ch) | two-column A4, front matter single-column |
-| Body size | 16px, line-height 1.7 | 9.5pt, line-height 1.45 |
-| Wide elements | normal width | `column-span: all` |
-| Video | playable | poster / placeholder + source URL |
-| Long equations | horizontal scroll | constrained to column |
-| Links | accent-colored underline | plain text (optional URL display) |
+| Aspect         | Screen                         | Print                                     |
+| -------------- | ------------------------------ | ----------------------------------------- |
+| Layout         | single centered column (~78ch) | two-column A4, front matter single-column |
+| Body size      | 16px, line-height 1.7          | 9.5pt, line-height 1.45                   |
+| Wide elements  | normal width                   | `column-span: all`                        |
+| Video          | playable                       | poster / placeholder + source URL         |
+| Long equations | horizontal scroll              | constrained to column                     |
+| Links          | accent-colored underline       | plain text (optional URL display)         |
 
 To print external URLs after link text, add `class="print-show-urls"` to `<body>` in a post-processing step or custom template — it is off by default to keep output quiet.
 
@@ -247,4 +247,4 @@ test/
 
 ## License
 
-MIT
+GPL3
