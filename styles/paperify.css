@@ -644,11 +644,11 @@ hr {
 
   /* ---- Video degrades to poster / placeholder ------------------------ */
 
-  .video-figure video {
+  .paper-content .video-figure video {
     display: none;               /* also hides browser video controls */
   }
 
-  .video-print-fallback {
+  .paper-content .video-print-fallback {
     display: block;
   }
 

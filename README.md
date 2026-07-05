@@ -7,15 +7,17 @@ Paperify is a lightweight Markdown-to-HTML converter for academic writing. It is
 - **Screen** — a single, centered reading column that is comfortable on desktop and mobile.
 - **Print / PDF** — a two-column A4 academic paper, produced by the browser's own print engine. The title, authors, abstract, and keywords stay single-column; the article body flows into two columns with careful break control.
 
-The same HTML file serves both. There is no runtime JavaScript, no server, and no build-time browser dependency.
+The same compiled HTML file serves both. There is no runtime JavaScript and no server. Direct `.pdf` output uses Puppeteer/Chromium at build time.
 
 ## Installation
+
+Paperify requires Node.js 24 LTS or newer. The repo includes an `.nvmrc` pinned to the current latest LTS, Node.js 24.18.0.
 
 ```bash
 npm install          # install dependencies
 npm run build        # compile TypeScript to dist/
 npm test             # run the test suite
-npm run example      # build examples/sample.md into dist/sample.html
+npm run example      # compile examples/sample.md into dist/sample.html
 ```
 
 To use the CLI from anywhere:
@@ -23,6 +25,7 @@ To use the CLI from anywhere:
 ```bash
 npm install -g .     # or: npm link
 paperify input.md -o output.html
+paperify input.md -o output.pdf
 ```
 
 ## CLI usage
@@ -30,18 +33,23 @@ paperify input.md -o output.html
 ```
 paperify <input.md> [options]
 
---output, -o <file>   Output HTML path (default: <input>.html)
+--output, -o <file>   Compile to this path; .pdf also writes sibling .html
+                      (default: <input>.html)
 --css <file>          Custom CSS file path (default: bundled paperify.css)
---embed-css           Embed CSS into the HTML instead of linking it
+--embed-css           Compatibility option; compiled HTML always embeds CSS
 --unsafe-html         Allow sanitized raw HTML inside Markdown
 --title <title>       Override title from frontmatter
 --lang <lang>         HTML language attribute (default: en)
+--browser-executable <file>
+                      Chrome/Chromium executable for PDF output
 --watch               Rebuild on file changes
---copy-assets         Copy local image/video assets to the output directory
+--copy-assets         Compatibility option; images/posters compile inline
 --help                Show help
 ```
 
-By default Paperify writes one HTML file that links to `paperify.css`, and places a copy of the stylesheet next to the output so the page works immediately. With `--embed-css` the stylesheet is inlined into a `<style>` tag instead, producing a fully self-contained file (documents with math still reference the KaTeX stylesheet from a CDN; see below).
+Paperify compiles Markdown to a self-contained HTML file. The compiled HTML embeds Paperify CSS, local images, video posters/fallbacks, KaTeX CSS, and KaTeX fonts as data URIs, so the HTML can be opened on its own. Video files themselves are not embedded; use `--copy-assets` if you want local video sources copied next to the output for playback.
+
+When the output path ends in `.pdf`, Paperify first writes the compiled HTML beside the PDF, then opens that HTML with Puppeteer's Chromium engine and prints it to PDF. For example, `paperify paper.md -o dist/paper.pdf` writes both `dist/paper.html` and `dist/paper.pdf`.
 
 ## Markdown conventions
 
@@ -76,7 +84,7 @@ All fields are optional. Authors may also be plain strings, and keywords may be 
 - Inline math: `$E = mc^2$`
 - Display math: `$$ ... $$`
 
-Math is rendered **statically at build time** with KaTeX — the output HTML needs no JavaScript to display equations. The generated document links the KaTeX stylesheet from the jsDelivr CDN (only when the document actually contains math). For fully offline viewing, download `katex.min.css` and its `fonts/` directory from the `katex` npm package into your output directory and point the `<link>` at the local copy.
+Math is rendered **statically at build time** with KaTeX — the output HTML needs no JavaScript to display equations. Compiled HTML embeds the KaTeX stylesheet and fonts from the installed `katex` package.
 
 In print, display equations are kept inside their column, sized with restraint, and prevented from breaking across columns where the engine supports it. On screen, very long equations scroll horizontally instead of overflowing.
 
@@ -140,10 +148,21 @@ To print external URLs after link text, add `class="print-show-urls"` to `<body>
 
 ## Exporting to PDF
 
-1. Open the generated HTML file in a browser (Chromium-based browsers currently give the most predictable multi-column output).
-2. Choose **Print → Save as PDF**.
-3. Set paper size to **A4**, margins to **Default** (the stylesheet's `@page` rule controls the real margins), and **disable** "Headers and footers" for a clean page.
-4. Enable "Background graphics" only if your theme relies on backgrounds; the default theme does not.
+The recommended path is direct PDF output:
+
+```bash
+paperify paper.md -o paper.pdf
+```
+
+Paperify uses Puppeteer to open the compiled HTML file and print with Chromium's `print` media type, `preferCSSPageSize`, and background graphics enabled. The stylesheet's `@page` rule controls the A4 page size and margins.
+
+If Puppeteer cannot find or launch its managed browser, install it with `npx puppeteer browsers install chrome`, or point Paperify at an existing Chrome/Chromium binary:
+
+```bash
+paperify paper.md -o paper.pdf --browser-executable "/path/to/chrome"
+```
+
+You can still open an HTML output in a browser and choose **Print → Save as PDF**, but browser print engines vary. Chromium-based browsers remain the most predictable manual export path.
 
 ## Customizing paperify.css
 
@@ -169,15 +188,17 @@ The file is organized into numbered, commented sections (tokens → base → rea
 
 - **Not a full LaTeX replacement.** No numbered equations/theorems, cross-reference resolution, or automatic figure numbering.
 - **No citation processor in v1.** Write the references section manually in Markdown (BibTeX/CSL support would layer cleanly on the pipeline later).
-- **Browser print engines vary.** Column balancing, `break-inside`, and `column-span` support differ between Chromium, Firefox, and Safari. Chromium is the recommended PDF export path.
+- **Browser print engines vary.** Column balancing, `break-inside`, and `column-span` support differ between Chromium, Firefox, and Safari. Direct `.pdf` output uses Puppeteer/Chromium for a more stable export path.
 - **Advanced float placement and true page-bottom footnotes are out of scope.** Figures print where they occur, and footnotes collect at the end of the document.
 
 ## Project layout
 
 ```
 src/
-  cli.ts                     CLI: args, watch, asset copying
+  cli.ts                     CLI: args, watch, compile/PDF orchestration
+  compile.ts                 self-contained compiled HTML generation
   convert.ts                 unified pipeline (remark → rehype)
+  pdf.ts                     Puppeteer PDF rendering
   template.ts                standalone HTML document assembly
   frontmatter.ts             YAML metadata parsing & normalization
   assets.ts                  local asset collection & copying

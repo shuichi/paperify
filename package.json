@@ -25,17 +25,18 @@
     "README.md"
   ],
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=24.18.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "example": "npm run build && node dist/cli.js examples/sample.md -o dist/sample.html --copy-assets"
+    "example": "npm run build && node dist/cli.js examples/sample.md -o dist/sample.html"
   },
   "dependencies": {
     "gray-matter": "^4.0.3",
-    "katex": "^0.16.22",
+    "katex": "^0.17.0",
     "mdast-util-directive": "^3.1.0",
+    "puppeteer": "^25.3.0",
     "rehype-katex": "^7.0.1",
     "rehype-raw": "^7.0.0",
     "rehype-sanitize": "^6.0.0",
@@ -53,8 +54,8 @@
   "devDependencies": {
     "@types/hast": "^3.0.4",
     "@types/mdast": "^4.0.4",
-    "@types/node": "^22.0.0",
-    "typescript": "^5.6.0",
-    "vitest": "^3.0.0"
+    "@types/node": "^24.13.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }

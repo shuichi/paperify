@@ -4,7 +4,8 @@
  *
  * The `paperify` command line interface.
  *
- *   paperify input.md -o output.html
+ *   paperify input.md -o output.html   # compile Markdown to HTML
+ *   paperify input.md -o output.pdf
  */
 
 import fs from 'node:fs'
@@ -14,6 +15,8 @@ import { fileURLToPath } from 'node:url'
 
 import { convert } from './convert.js'
 import { copyAssets } from './assets.js'
+import { compileHtml } from './compile.js'
+import { renderPdf } from './pdf.js'
 import type { CssMode } from './template.js'
 
 const HELP = `paperify — CSS-first academic Markdown-to-HTML publishing
@@ -22,19 +25,22 @@ Usage:
   paperify <input.md> [options]
 
 Options:
-  --output, -o <file>   Output HTML path (default: <input>.html)
+  --output, -o <file>   Compile to this path; .pdf also writes sibling .html
+                        (default: <input>.html)
   --css <file>          Custom CSS file path (default: bundled paperify.css)
-  --embed-css           Embed CSS into the HTML instead of linking it
+  --embed-css           Compatibility option; compiled HTML always embeds CSS
   --unsafe-html         Allow sanitized raw HTML inside Markdown
   --title <title>       Override title from frontmatter
   --lang <lang>         HTML language attribute (default: en)
+  --browser-executable <file>
+                        Chrome/Chromium executable for PDF output
   --watch               Rebuild on file changes
-  --copy-assets         Copy local image/video assets to the output directory
+  --copy-assets         Compatibility option; images/posters compile inline
   --help                Show this help
 
 Examples:
   paperify paper.md -o dist/paper.html
-  paperify paper.md -o dist/paper.html --embed-css --copy-assets
+  paperify paper.md -o dist/paper.pdf
   paperify paper.md --css mytheme.css --watch
 `
 
@@ -46,6 +52,7 @@ interface CliOptions {
   unsafeHtml: boolean
   title?: string
   lang?: string
+  browserExecutable?: string
   watch: boolean
   copyAssets: boolean
 }
@@ -60,6 +67,7 @@ function parseArgs(argv: string[]): CliOptions | 'help' {
   let unsafeHtml = false
   let title: string | undefined
   let lang: string | undefined
+  let browserExecutable: string | undefined
   let watch = false
   let copy = false
 
@@ -100,6 +108,10 @@ function parseArgs(argv: string[]): CliOptions | 'help' {
         lang = takeValue(arg, i)
         i++
         break
+      case '--browser-executable':
+        browserExecutable = takeValue(arg, i)
+        i++
+        break
       case '--watch':
         watch = true
         break
@@ -137,6 +149,7 @@ function parseArgs(argv: string[]): CliOptions | 'help' {
     unsafeHtml,
     title,
     lang,
+    browserExecutable,
     watch,
     copyAssets: copy
   }
@@ -158,6 +171,16 @@ function resolveCssSource(options: CliOptions): string {
   return cssPath
 }
 
+function isPdfOutput(output: string): boolean {
+  return path.extname(output).toLowerCase() === '.pdf'
+}
+
+function compiledHtmlPathForOutput(output: string): string {
+  if (!isPdfOutput(output)) return output
+  const parsed = path.parse(output)
+  return path.join(parsed.dir, `${parsed.name}.html`)
+}
+
 async function buildOnce(options: CliOptions): Promise<void> {
   if (!fs.existsSync(options.input)) {
     throw new CliError(`Input file not found: ${options.input}`)
@@ -165,13 +188,10 @@ async function buildOnce(options: CliOptions): Promise<void> {
 
   const markdown = fs.readFileSync(options.input, 'utf8')
   const cssPath = resolveCssSource(options)
+  const outputIsPdf = isPdfOutput(options.output)
+  const inputDir = path.dirname(path.resolve(options.input))
 
-  let css: CssMode
-  if (options.embedCss) {
-    css = { mode: 'embed', content: fs.readFileSync(cssPath, 'utf8') }
-  } else {
-    css = { mode: 'link', href: path.basename(cssPath) }
-  }
+  const css: CssMode = { mode: 'embed', content: fs.readFileSync(cssPath, 'utf8') }
 
   const result = await convert(markdown, {
     css,
@@ -181,24 +201,32 @@ async function buildOnce(options: CliOptions): Promise<void> {
   })
 
   const outputDir = path.dirname(path.resolve(options.output))
+  const compiledHtmlPath = path.resolve(compiledHtmlPathForOutput(options.output))
+  const compiledHtmlDir = path.dirname(compiledHtmlPath)
   fs.mkdirSync(outputDir, { recursive: true })
-  fs.writeFileSync(options.output, result.html, 'utf8')
+  fs.mkdirSync(compiledHtmlDir, { recursive: true })
 
-  // When linking (the default), place the stylesheet next to the output
-  // so the generated page works immediately.
-  if (!options.embedCss) {
-    const cssTarget = path.join(outputDir, path.basename(cssPath))
-    if (path.resolve(cssPath) !== cssTarget) {
-      fs.copyFileSync(cssPath, cssTarget)
-    }
+  const compiled = compileHtml({
+    html: result.html,
+    inputDir
+  })
+  fs.writeFileSync(compiledHtmlPath, compiled.html, 'utf8')
+
+  if (outputIsPdf) {
+    await renderPdf({
+      htmlPath: compiledHtmlPath,
+      outputPath: path.resolve(options.output),
+      browserExecutablePath: options.browserExecutable
+        ? path.resolve(options.browserExecutable)
+        : undefined
+    })
   }
 
-  for (const warning of result.warnings) {
+  for (const warning of [...result.warnings, ...compiled.warnings]) {
     console.warn(`paperify: warning: ${warning}`)
   }
 
   if (options.copyAssets) {
-    const inputDir = path.dirname(path.resolve(options.input))
     const { copied, missing } = copyAssets(result.assets, inputDir, outputDir)
     if (copied.length > 0) {
       console.log(`paperify: copied ${copied.length} asset(s): ${copied.join(', ')}`)
@@ -208,7 +236,10 @@ async function buildOnce(options: CliOptions): Promise<void> {
     }
   }
 
-  console.log(`paperify: wrote ${options.output}`)
+  console.log(`paperify: compiled ${compiledHtmlPath}`)
+  if (outputIsPdf) {
+    console.log(`paperify: wrote ${options.output}`)
+  }
 }
 
 function watchAndRebuild(options: CliOptions): void {
