@@ -1,58 +1,11 @@
-<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="paperify-icon-title paperify-icon-desc">
-  <title id="paperify-icon-title">Paperify icon</title>
-  <desc id="paperify-icon-desc">A portable academic paper with two-column layout and layered CSS-inspired accents.</desc>
-
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Paperify icon">
   <rect width="512" height="512" rx="108" fill="#16243a"/>
-
-  <path d="M86 132h46c12 0 22 10 22 22v238c0 12-10 22-22 22H86V132Z" fill="#45c0b4"/>
-  <path d="M86 184h36c12 0 22 10 22 22v208H86V184Z" fill="#f0b34a"/>
-
-  <path d="M116 76h244l56 56v322c0 10-8 18-18 18H116c-10 0-18-8-18-18V94c0-10 8-18 18-18Z" fill="#07111e" opacity="0.26"/>
-  <path d="M116 60h244l56 56v322c0 10-8 18-18 18H116c-10 0-18-8-18-18V78c0-10 8-18 18-18Z" fill="#fffaf0"/>
-  <path d="M360 60v56h56L360 60Z" fill="#dce9e8"/>
-  <path d="M360 116h56l-56 18V116Z" fill="#bdd1cf" opacity="0.6"/>
-
-  <g fill="#19243a">
-    <rect x="132" y="98" width="170" height="18" rx="5"/>
-    <rect x="132" y="126" width="116" height="9" rx="4.5" opacity="0.48"/>
-  </g>
-
-  <g fill="#45c0b4">
-    <rect x="270" y="126" width="20" height="9" rx="4.5"/>
-    <rect x="296" y="126" width="20" height="9" rx="4.5"/>
-    <rect x="322" y="126" width="20" height="9" rx="4.5"/>
-  </g>
-
-  <rect x="132" y="154" width="238" height="34" rx="8" fill="#e7f4f2"/>
-  <g fill="#7aa3a0">
-    <rect x="148" y="166" width="86" height="6" rx="3"/>
-    <rect x="244" y="166" width="84" height="6" rx="3"/>
-    <rect x="148" y="178" width="150" height="6" rx="3"/>
-  </g>
-
-  <path d="M252 210v186" stroke="#d5d8d2" stroke-width="2" stroke-linecap="round"/>
-
-  <g fill="#c5c9c5">
-    <rect x="132" y="212" width="94" height="8" rx="4"/>
-    <rect x="132" y="235" width="106" height="8" rx="4"/>
-    <rect x="132" y="258" width="78" height="8" rx="4"/>
-    <rect x="132" y="281" width="100" height="8" rx="4"/>
-    <rect x="132" y="374" width="102" height="8" rx="4"/>
-    <rect x="132" y="397" width="70" height="8" rx="4"/>
-    <rect x="270" y="212" width="92" height="8" rx="4"/>
-    <rect x="270" y="235" width="76" height="8" rx="4"/>
-    <rect x="270" y="258" width="104" height="8" rx="4"/>
-    <rect x="270" y="281" width="82" height="8" rx="4"/>
-    <rect x="270" y="374" width="98" height="8" rx="4"/>
-    <rect x="270" y="397" width="64" height="8" rx="4"/>
-  </g>
-
-  <rect x="132" y="306" width="240" height="48" rx="8" fill="#f7ead0"/>
-  <path d="M148 338l30-26 28 17 31-24 34 31 30-18 55 20" fill="none" stroke="#c58522" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="237" cy="305" r="6" fill="#45c0b4"/>
-
-  <g fill="#19243a">
-    <rect x="132" y="424" width="48" height="8" rx="4"/>
-    <rect x="188" y="424" width="78" height="8" rx="4" opacity="0.5"/>
+  <path d="M132 48h196l88 88v292a36 36 0 0 1-36 36H132a36 36 0 0 1-36-36V84a36 36 0 0 1 36-36Z" fill="#fffaf0"/>
+  <path d="M328 48v88h88Z" fill="#45c0b4"/>
+  <g stroke="#16243a" stroke-width="36" stroke-linecap="round" fill="none">
+    <path d="M234 200 210 380"/>
+    <path d="M314 200 290 380"/>
+    <path d="M178 260h174"/>
+    <path d="M166 324h174"/>
   </g>
 </svg>

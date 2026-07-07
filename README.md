@@ -30,7 +30,6 @@ To use the CLI from anywhere:
 npm install -g .     # or: npm link
 paperify input.md -o output.html
 paperify input.md -o output.pdf
-paperify input.md --fontset japanese -o output.pdf
 ```
 
 ## CLI usage
@@ -41,8 +40,6 @@ paperify <input.md> [options]
 --output, -o <file>   Compile to this path; .pdf also writes sibling .html
                       (default: <input>.html)
 --css <file>          Custom CSS file path (default: bundled paperify.css)
---fontset <name>      Add bundled font CSS after the base stylesheet
-                      (for example: japanese)
 --bib, --bibliography <file>
                       BibTeX bibliography file
                       (default: <input>.bib when present)
@@ -95,6 +92,8 @@ footerTemplate: |
 
 All fields are optional. Authors may also be plain strings, and keywords may be a comma-separated string. Regular document metadata is normalized and HTML-escaped before rendering. `headerTemplate` and `footerTemplate` are used only for direct PDF output and are passed through as Puppeteer header/footer HTML templates.
 
+`lang` sets the generated `<html lang="...">` attribute. The bundled stylesheet uses that attribute for language-aware typography; for Japanese papers, set `lang: ja` (or `language: ja-JP`) to switch the body and heading font variables automatically.
+
 ### Math
 
 - Inline math: `$E = mc^2$`
@@ -126,6 +125,7 @@ paperify paper.md --csl association-for-computing-machinery -o paper.html
 ```
 
 The generated citations and references are static HTML, so the compiled document still needs no runtime JavaScript.
+Citation markers link to their corresponding bibliography entries in the generated references list.
 
 ### Images and figures
 
@@ -236,8 +236,8 @@ The stylesheet is the deliverable that does the visual work — the HTML is inte
 Options for theming:
 
 - **Override variables** in a small stylesheet loaded after `paperify.css`.
-- **Use a bundled fontset** with `--fontset japanese`; Paperify loads `styles/paperify.css` first, then `styles/fontset/japanese.css`.
 - **Pass your own stylesheet** with `--css mytheme.css` (start from a copy of `styles/paperify.css`).
+- **Use language-aware defaults** by setting `lang: ja` in frontmatter or passing `--lang ja`; `paperify.css` applies Japanese body and heading fonts with `:root:lang(ja)`.
 - Print-specific knobs (`--print-body-size`, `--print-line-height`, `--print-column-gap`) live in the same `:root` block.
 
 The file is organized into numbered, commented sections (tokens → base → reading column → front matter → content → print) so it is safe to edit surgically.

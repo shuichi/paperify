@@ -32,10 +32,9 @@ The codebase is intentionally small. Main responsibilities:
 - `src/compile.ts`: local image/poster and KaTeX CSS/font inlining for compiled HTML.
 - `src/pdf.ts`: Puppeteer/Chromium PDF rendering.
 - `src/assets.ts`: local asset collection and optional copying for `--copy-assets`.
-- `src/styleSources.ts`: bundled CSS, custom CSS, and fontset resolution.
+- `src/styleSources.ts`: bundled and custom CSS resolution.
 - `src/transforms/*.ts`: Paperify-specific Markdown transforms and raw HTML schema.
 - `styles/paperify.css`: the primary rendering layer for screen and print.
-- `styles/fontset/japanese.css`: bundled Japanese font overrides.
 - `test/*.test.ts`: behavioral contracts for conversion, compilation, style loading, and PDF options.
 
 ## Conversion Pipeline
@@ -80,6 +79,8 @@ Supported fields:
 Authors may be plain strings or objects with `name`, `affiliation`, and
 `email`. Keywords may be an array or a comma-separated string. YAML date objects
 are normalized to `YYYY-MM-DD`. Metadata rendered into HTML must be escaped.
+`lang` sets the generated `<html lang>` attribute and drives language-aware
+CSS such as `:root:lang(ja)` font variables.
 
 `headerTemplate` and `footerTemplate` are only used for direct PDF output and
 are passed to Puppeteer's header/footer template support.
@@ -196,8 +197,9 @@ Important print behavior:
 - Links print as plain text by default.
 - `body.print-show-urls` opt-in displays external URLs after link text.
 
-The bundled `japanese` fontset is loaded after the base stylesheet and only
-overrides font-related CSS variables.
+Japanese font defaults live in `styles/paperify.css` under `:root:lang(ja)`,
+so frontmatter such as `lang: ja` switches typography without a separate
+stylesheet.
 
 ## PDF Output
 
@@ -242,7 +244,7 @@ or shared contracts change.
   `test/convert.test.ts`
 - Compiled standalone HTML and asset inlining:
   `test/compile.test.ts`
-- CSS and fontset resolution:
+- CSS source resolution and language font defaults:
   `test/styleSources.test.ts`
 - PDF option behavior:
   `test/pdf.test.ts`

@@ -37,6 +37,8 @@ export interface CitationState {
   options: CitationOptions
   items: Map<string, CslItem>
   clusters: CitationCluster[]
+  referenceIds: Map<string, string>
+  usedReferenceIds: Set<string>
 }
 
 interface CslItem {
@@ -92,6 +94,7 @@ type CiteprocCitationResult = [
 interface CiteprocBibliographyMeta {
   bibliography_errors?: unknown[]
   'second-field-align'?: boolean | string
+  entry_ids?: string[][]
   bibstart?: string
   bibend?: string
 }
@@ -109,7 +112,9 @@ export function createCitationState(options: CitationOptions): CitationState {
   return {
     options,
     items,
-    clusters: []
+    clusters: [],
+    referenceIds: new Map(),
+    usedReferenceIds: new Set()
   }
 }
 
@@ -161,9 +166,13 @@ export function renderCitations(state: CitationState): {
       const cites = renderedCluster
         ? renderedCluster.items.map((item) => item.id).join(' ')
         : ''
+      const firstItemId = renderedCluster?.items[0]?.id
+      const href = firstItemId
+        ? ` href="#${escapeHtml(referenceIdForKey(state, firstItemId))}"`
+        : ''
       renderedCitations.set(
         citationId,
-        `<span class="citation" data-cites="${escapeHtml(cites)}">${html}</span>`
+        `<a class="citation" data-cites="${escapeHtml(cites)}"${href}>${html}</a>`
       )
     }
 
@@ -180,7 +189,10 @@ export function renderCitations(state: CitationState): {
     throw new Error('Citation processor reported an error while rendering bibliography')
   }
 
-  const bibliographyBody = `${meta.bibstart ?? ''}${entries.join('')}${meta.bibend ?? ''}`.trim()
+  const entriesWithIds = entries.map((entry, index) =>
+    addReferenceIdsToEntry(entry, meta.entry_ids?.[index] ?? [], state)
+  )
+  const bibliographyBody = `${meta.bibstart ?? ''}${entriesWithIds.join('')}${meta.bibend ?? ''}`.trim()
   const sectionClass = meta['second-field-align']
     ? 'paper-references csl-second-field-align'
     : 'paper-references'
@@ -308,6 +320,58 @@ function validateCluster(state: CitationState, cluster: CitationCluster): void {
       throw new Error(`Citation key not found in BibTeX: ${item.id}`)
     }
   }
+}
+
+function addReferenceIdsToEntry(
+  entry: string,
+  itemIds: string[],
+  state: CitationState
+): string {
+  const referenceIds = Array.from(
+    new Set(itemIds.map((id) => referenceIdForKey(state, id)))
+  )
+  const [primaryId, ...secondaryIds] = referenceIds
+  if (!primaryId) return entry
+
+  const secondaryAnchors = secondaryIds
+    .map(
+      (id) =>
+        `<span class="reference-anchor" id="${escapeHtml(id)}" aria-hidden="true"></span>`
+    )
+    .join('')
+  const cslEntryPattern =
+    /<div\b([^>]*\bclass=["'][^"']*\bcsl-entry\b[^"']*["'][^>]*)>/i
+
+  if (!cslEntryPattern.test(entry)) {
+    return `<span class="reference-anchor" id="${escapeHtml(primaryId)}"></span>${entry}`
+  }
+
+  return entry.replace(cslEntryPattern, (match, attrs: string) => {
+    if (/\bid\s*=/.test(attrs)) return `${match}${secondaryAnchors}`
+    return `<div id="${escapeHtml(primaryId)}"${attrs}>${secondaryAnchors}`
+  })
+}
+
+function referenceIdForKey(state: CitationState, key: string): string {
+  const existing = state.referenceIds.get(key)
+  if (existing) return existing
+
+  const base = `ref-${sanitizeReferenceId(key)}`
+  let candidate = base
+  let suffix = 2
+  while (state.usedReferenceIds.has(candidate)) {
+    candidate = `${base}-${suffix}`
+    suffix++
+  }
+
+  state.referenceIds.set(key, candidate)
+  state.usedReferenceIds.add(candidate)
+  return candidate
+}
+
+function sanitizeReferenceId(key: string): string {
+  const sanitized = key.replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')
+  return sanitized || 'item'
 }
 
 function retrieveLocale(locale: string): string {

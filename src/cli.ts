@@ -29,8 +29,6 @@ Options:
   --output, -o <file>   Compile to this path; .pdf also writes sibling .html
                         (default: <input>.html)
   --css <file>          Custom CSS file path (default: bundled paperify.css)
-  --fontset <name>      Add bundled font CSS after the base stylesheet
-                        (for example: japanese)
   --bib, --bibliography <file>
                         BibTeX bibliography file (default: <input>.bib when present)
   --csl <id>            Zotero Style Repository CSL style ID
@@ -48,7 +46,6 @@ Options:
 Examples:
   paperify paper.md -o dist/paper.html
   paperify paper.md -o dist/paper.pdf
-  paperify paper.md --fontset japanese -o dist/paper.pdf
   paperify paper.md --css mytheme.css --watch
 `
 
@@ -56,7 +53,6 @@ interface CliOptions {
   input: string
   output: string
   cssFile?: string
-  fontset?: string
   bibFile?: string
   cslStyle: string
   embedCss: boolean
@@ -74,7 +70,6 @@ function parseArgs(argv: string[]): CliOptions | 'help' {
   const positional: string[] = []
   let output: string | undefined
   let cssFile: string | undefined
-  let fontset: string | undefined
   let bibFile: string | undefined
   let cslStyle = DEFAULT_CSL_STYLE
   let embedCss = false
@@ -109,9 +104,9 @@ function parseArgs(argv: string[]): CliOptions | 'help' {
         i++
         break
       case '--fontset':
-        fontset = takeValue(arg, i)
-        i++
-        break
+        throw new CliError(
+          '--fontset has been removed. Set lang: ja in frontmatter, or pass --lang ja, to use Japanese font defaults.'
+        )
       case '--bib':
       case '--bibliography':
         bibFile = takeValue(arg, i)
@@ -172,7 +167,6 @@ function parseArgs(argv: string[]): CliOptions | 'help' {
     input,
     output: resolvedOutput,
     cssFile,
-    fontset,
     bibFile,
     cslStyle,
     embedCss,

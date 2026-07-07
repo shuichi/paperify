@@ -80,6 +80,14 @@ describe('frontmatter parsing', () => {
     expect(meta.footerTemplate).toContain('class="pageNumber"')
     expect(meta.footerTemplate).toContain('class="totalPages"')
   })
+
+  it('normalizes language metadata aliases', () => {
+    const direct = parseFrontmatter('---\nlang: ja\n---\ntext\n')
+    const alias = parseFrontmatter('---\nlanguage: ja-JP\n---\ntext\n')
+
+    expect(direct.meta.lang).toBe('ja')
+    expect(alias.meta.lang).toBe('ja-JP')
+  })
 })
 
 describe('basic Markdown conversion', () => {
@@ -167,11 +175,11 @@ describe('citations', () => {
     })
 
     expect(contentHtml).toContain(
-      '<span class="citation" data-cites="knuth1984texbook">'
+      '<a class="citation" data-cites="knuth1984texbook" href="#ref-knuth1984texbook">'
     )
     expect(contentHtml).toContain('(Knuth, 1984)')
     expect(contentHtml).toContain('<section class="paper-references" id="references">')
-    expect(contentHtml).toContain('class="csl-entry"')
+    expect(contentHtml).toContain('id="ref-knuth1984texbook" class="csl-entry"')
     expect(contentHtml).toContain('The TeXbook')
   })
 
@@ -184,6 +192,8 @@ describe('citations', () => {
     expect(contentHtml).toContain(
       'data-cites="knuth1984texbook lamport1994latex"'
     )
+    expect(contentHtml).toContain('href="#ref-knuth1984texbook"')
+    expect(contentHtml).toContain('id="ref-lamport1994latex" class="csl-entry"')
     expect(contentHtml).toContain('Knuth, 1984')
     expect(contentHtml).toContain('Lamport, 1994')
   })
@@ -347,6 +357,16 @@ describe('stylesheet', () => {
     }
   })
 
+  it('defines Japanese font variables from the document language', () => {
+    expect(css).toContain(':root:lang(ja)')
+    expect(css).toContain(
+      '--font-body: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif'
+    )
+    expect(css).toContain(
+      '--font-heading: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif'
+    )
+  })
+
   it('styles highlight.js token classes', () => {
     expect(css).toContain('.paper-content pre code.hljs')
     expect(css).toContain('.paper-content .hljs-keyword')
@@ -375,6 +395,18 @@ describe('generated document structure', () => {
     expect(html).toContain('<section class="paper-keywords">')
     expect(html).toContain('<article class="paper-content">')
     expect(html).toContain('<title>Minimal Paper</title>')
+  })
+
+  it('uses frontmatter language for the html lang attribute', async () => {
+    const { html } = await convert('---\nlang: ja\n---\nbody\n')
+
+    expect(html).toContain('<html lang="ja">')
+  })
+
+  it('supports the language frontmatter alias', async () => {
+    const { html } = await convert('---\nlanguage: ja-JP\n---\nbody\n')
+
+    expect(html).toContain('<html lang="ja-JP">')
   })
 
   it('escapes metadata safely', async () => {
