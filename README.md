@@ -48,7 +48,8 @@ paperify <input.md> [options]
 --embed-css           Compatibility option; compiled HTML always embeds CSS
 --unsafe-html         Allow sanitized raw HTML inside Markdown
 --title <title>       Override title from frontmatter
---lang <lang>         HTML language attribute (default: en)
+--lang <lang>         Override the HTML language attribute
+                      (default: frontmatter lang, then en)
 --browser-executable <file>
                       Chrome/Chromium executable for PDF output
 --watch               Rebuild on file changes
@@ -59,6 +60,34 @@ paperify <input.md> [options]
 Paperify compiles Markdown to a self-contained HTML file. The compiled HTML embeds Paperify CSS, local images, video posters/fallbacks, KaTeX CSS, and KaTeX fonts as data URIs, so the HTML can be opened on its own. Video files themselves are not embedded; use `--copy-assets` if you want local video sources copied next to the output for playback.
 
 When the output path ends in `.pdf`, Paperify first writes the compiled HTML beside the PDF, then opens that HTML with Puppeteer's Chromium engine and prints it to PDF. For example, `paperify paper.md -o dist/paper.pdf` writes both `dist/paper.html` and `dist/paper.pdf`.
+
+## Example documents
+
+The repository includes English and Japanese sample papers that exercise the same features: frontmatter, math, citations, figures, tables, code, footnotes, and video.
+
+- `examples/sample.md` is the English sample used by `npm run example`.
+- `examples/sample.ja.md` is the Japanese sample. Its frontmatter sets `lang: ja`, so the generated HTML uses `<html lang="ja">` and the bundled CSS switches to Japanese font variables with `:root:lang(ja)`.
+- `examples/sample.bib` provides the shared BibTeX entries used by both samples.
+
+Build the default English sample:
+
+```bash
+npm run example
+```
+
+Build the Japanese sample:
+
+```bash
+npm run build
+node dist/cli.js examples/sample.ja.md --bib examples/sample.bib -o dist/sample.ja.html
+```
+
+Build the Japanese sample as PDF:
+
+```bash
+npm run build
+node dist/cli.js examples/sample.ja.md --bib examples/sample.bib -o dist/sample.ja.pdf
+```
 
 ## Markdown conventions
 
@@ -235,8 +264,8 @@ The stylesheet is the deliverable that does the visual work — the HTML is inte
 
 Options for theming:
 
-- **Override variables** in a small stylesheet loaded after `paperify.css`.
-- **Pass your own stylesheet** with `--css mytheme.css` (start from a copy of `styles/paperify.css`).
+- **Pass your own stylesheet** with `--css mytheme.css` (start from a copy of `styles/paperify.css`; custom CSS replaces the bundled stylesheet).
+- **Override variables** by editing a copied stylesheet or adding overrides to a custom stylesheet.
 - **Use language-aware defaults** by setting `lang: ja` in frontmatter or passing `--lang ja`; `paperify.css` applies Japanese body and heading fonts with `:root:lang(ja)`.
 - Print-specific knobs (`--print-body-size`, `--print-line-height`, `--print-column-gap`) live in the same `:root` block.
 
@@ -269,6 +298,8 @@ styles/
   paperify.css               the first-class stylesheet (screen + print)
 examples/
   sample.md                  demonstrates every feature
+  sample.ja.md               Japanese version with lang: ja
+  sample.bib                 shared bibliography for the samples
 test/
   convert.test.ts            Vitest suite
 ```
