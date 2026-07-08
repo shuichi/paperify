@@ -12,7 +12,7 @@
     "katex",
     "publishing"
   ],
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "type": "module",
   "bin": {
     "paperify": "dist/cli.js"

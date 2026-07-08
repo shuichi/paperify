@@ -19,6 +19,14 @@ import { renderPdf } from './pdf.js'
 import { readStyleBundle, resolveCssPaths } from './styleSources.js'
 import type { CssMode } from './template.js'
 import { DEFAULT_CSL_STYLE, fetchCslStyle } from './csl.js'
+import { parseFrontmatter } from './frontmatter.js'
+import {
+  defaultBibPathForInput,
+  extractTrailingBibtexBlock,
+  markdownContainsCitations,
+  resolveBibliographySource,
+  type BibliographySource
+} from './bibliography.js'
 
 const HELP = `paperify — CSS-first academic Markdown-to-HTML publishing
 
@@ -30,7 +38,8 @@ Options:
                         (default: <input>.html)
   --css <file>          Custom CSS file path (default: bundled paperify.css)
   --bib, --bibliography <file>
-                        BibTeX bibliography file (default: <input>.bib when present)
+                        BibTeX bibliography file (default: frontmatter
+                        bibliography, terminal bibtex block, or <input>.bib)
   --csl <id>            Zotero Style Repository CSL style ID
                         (default: computing-surveys)
   --embed-css           Compatibility option; compiled HTML always embeds CSS
@@ -189,16 +198,19 @@ function compiledHtmlPathForOutput(output: string): string {
   return path.join(parsed.dir, `${parsed.name}.html`)
 }
 
-function defaultBibPathForInput(input: string): string {
-  const parsed = path.parse(input)
-  return path.join(parsed.dir, `${parsed.name}.bib`)
-}
+function bibliographySourceForMarkdown(
+  options: CliOptions,
+  markdown: string
+): BibliographySource | undefined {
+  const extracted = extractTrailingBibtexBlock(markdown)
+  const { meta } = parseFrontmatter(extracted.markdown)
 
-function resolveBibPath(options: CliOptions): string | undefined {
-  if (options.bibFile) return path.resolve(options.bibFile)
-
-  const candidate = path.resolve(defaultBibPathForInput(options.input))
-  return fs.existsSync(candidate) ? candidate : undefined
+  return resolveBibliographySource({
+    inputPath: options.input,
+    cliBibFile: options.bibFile,
+    frontmatterBibliography: meta.bibliography,
+    embeddedBibtex: extracted.bibtex
+  })
 }
 
 async function buildOnce(options: CliOptions): Promise<void> {
@@ -206,24 +218,44 @@ async function buildOnce(options: CliOptions): Promise<void> {
     throw new CliError(`Input file not found: ${options.input}`)
   }
 
-  const markdown = fs.readFileSync(options.input, 'utf8')
+  const rawMarkdown = fs.readFileSync(options.input, 'utf8')
+  const extracted = extractTrailingBibtexBlock(rawMarkdown)
+  const markdown = extracted.markdown
+  const frontmatter = parseFrontmatter(markdown)
+  const { meta } = frontmatter
   const styleBundle = readStyleBundle(options)
   const outputIsPdf = isPdfOutput(options.output)
   const inputDir = path.dirname(path.resolve(options.input))
-  const bibPath = resolveBibPath(options)
+  const bibliographySource = resolveBibliographySource({
+    inputPath: options.input,
+    cliBibFile: options.bibFile,
+    frontmatterBibliography: meta.bibliography,
+    embeddedBibtex: extracted.bibtex
+  })
   let citations:
     | { bibtex: string; cslXml: string; styleId: string }
     | undefined
 
-  if (bibPath) {
-    if (!fs.existsSync(bibPath)) {
-      throw new CliError(`BibTeX file not found: ${bibPath}`)
+  if (bibliographySource) {
+    let bibtex: string
+    if (bibliographySource.kind === 'file') {
+      if (!fs.existsSync(bibliographySource.path)) {
+        throw new CliError(`BibTeX file not found: ${bibliographySource.path}`)
+      }
+      bibtex = fs.readFileSync(bibliographySource.path, 'utf8')
+    } else {
+      bibtex = bibliographySource.bibtex
     }
+
     citations = {
-      bibtex: fs.readFileSync(bibPath, 'utf8'),
+      bibtex,
       cslXml: await fetchCslStyle(options.cslStyle),
       styleId: options.cslStyle
     }
+  } else if (markdownContainsCitations(frontmatter.content)) {
+    throw new CliError(
+      `Citation found, but no bibliography was provided. Add --bib, frontmatter bibliography, a terminal bibtex code block, or ${path.resolve(defaultBibPathForInput(options.input))}.`
+    )
   }
 
   const css: CssMode = { mode: 'embed', content: styleBundle.content }
@@ -283,8 +315,13 @@ async function buildOnce(options: CliOptions): Promise<void> {
 function watchAndRebuild(options: CliOptions): void {
   const targets = new Set<string>([path.resolve(options.input)])
   for (const cssPath of resolveCssPaths(options)) targets.add(cssPath)
-  const bibPath = resolveBibPath(options)
-  if (bibPath) targets.add(bibPath)
+  try {
+    const markdown = fs.readFileSync(options.input, 'utf8')
+    const bibliographySource = bibliographySourceForMarkdown(options, markdown)
+    if (bibliographySource?.kind === 'file') targets.add(bibliographySource.path)
+  } catch {
+    // buildOnce reports the actionable error; watch still tracks the input file.
+  }
 
   let timer: NodeJS.Timeout | undefined
   const rebuild = () => {

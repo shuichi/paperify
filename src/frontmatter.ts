@@ -22,6 +22,7 @@ export interface PaperMeta {
   abstract?: string
   keywords: string[]
   lang?: string
+  bibliography?: string
   headerTemplate?: string
   footerTemplate?: string
 }
@@ -105,6 +106,7 @@ export function parseFrontmatter(source: string): FrontmatterResult {
     abstract: asString(data.abstract),
     keywords: normalizeKeywords(data.keywords),
     lang: asString(data.lang ?? data.language),
+    bibliography: asString(data.bibliography),
     headerTemplate: asString(data.headerTemplate),
     footerTemplate: asString(data.footerTemplate)
   }

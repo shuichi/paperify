@@ -217,6 +217,17 @@ export function applyCitationHtml(
   return html
 }
 
+export function textContainsCitation(value: string): boolean {
+  let match: RegExpExecArray | null
+
+  CITATION_PATTERN.lastIndex = 0
+  while ((match = CITATION_PATTERN.exec(value)) !== null) {
+    if (parseCitationCluster(match[1])) return true
+  }
+
+  return false
+}
+
 function transformTextNodes(node: MdastNode, state: CitationState): void {
   if (!node.children) return
 

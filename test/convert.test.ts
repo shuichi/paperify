@@ -88,6 +88,14 @@ describe('frontmatter parsing', () => {
     expect(direct.meta.lang).toBe('ja')
     expect(alias.meta.lang).toBe('ja-JP')
   })
+
+  it('normalizes the bibliography metadata field', () => {
+    const { meta } = parseFrontmatter(
+      '---\nbibliography: references/paper.bib\n---\ntext\n'
+    )
+
+    expect(meta.bibliography).toBe('references/paper.bib')
+  })
 })
 
 describe('basic Markdown conversion', () => {

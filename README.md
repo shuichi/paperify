@@ -4,6 +4,8 @@
   <img src="./icon.svg" alt="Paperify icon" width="120" height="120">
 </p>
 
+[English](./README.md) | [日本語](./README.ja.md)
+
 **CSS-first academic publishing: Markdown in, one portable HTML file out — readable on screen, printable as a two-column paper.**
 
 Paperify is a lightweight Markdown-to-HTML converter for academic writing. It is deliberately _not_ a LaTeX clone. The converter stays small and emits minimal, semantic HTML; a carefully authored stylesheet (`paperify.css`) carries the layout and typography for both media:
@@ -42,7 +44,8 @@ paperify <input.md> [options]
 --css <file>          Custom CSS file path (default: bundled paperify.css)
 --bib, --bibliography <file>
                       BibTeX bibliography file
-                      (default: <input>.bib when present)
+                      (default: frontmatter bibliography,
+                      terminal bibtex block, or <input>.bib)
 --csl <id>            Zotero Style Repository CSL style ID
                       (default: computing-surveys)
 --embed-css           Compatibility option; compiled HTML always embeds CSS
@@ -141,11 +144,43 @@ Paperify builds on structured Markdown processing [@unified2015unified].
 Multiple sources can appear in one cluster [@foo; @bar].
 ```
 
-By default, Paperify looks for a BibTeX file beside the input Markdown with the same basename. For `paper.md`, it uses `paper.bib` when that file exists. You can pass a bibliography explicitly:
+Paperify resolves bibliography data in this order:
+
+1. `--bib` / `--bibliography` when passed explicitly. This path is resolved from the current working directory.
+2. `bibliography` in frontmatter. This path is resolved relative to the Markdown file.
+3. A terminal fenced code block tagged `bibtex`. This block is hidden from the rendered HTML and used as the BibTeX source. Empty or whitespace-only terminal `bibtex` blocks are hidden but ignored as a source.
+4. A BibTeX file beside the input Markdown with the same basename. For `paper.md`, Paperify uses `paper.bib` when that file exists.
+
+You can pass a bibliography explicitly:
 
 ```bash
 paperify paper.md --bib references.bib -o paper.html
 ```
+
+Or keep the bibliography path in frontmatter:
+
+```yaml
+---
+bibliography: references/paper.bib
+---
+```
+
+For compact, portable drafts, place BibTeX at the end of the Markdown file:
+
+````markdown
+Paperify builds on structured Markdown processing [@unified2015unified].
+
+```bibtex
+@misc{unified2015unified,
+  author = {{The unified collective}},
+  title = {unified: Content as Structured Data},
+  year = {2015},
+  url = {https://unifiedjs.com}
+}
+```
+````
+
+If citations such as `[@key]` are present but no bibliography source can be resolved, the CLI exits with a clear error.
 
 Citation formatting is produced at build time with Citation.js and citeproc-js. The CSL style is downloaded by ID from the Zotero Style Repository. The default style is `computing-surveys`; choose another Zotero style ID with `--csl`:
 
@@ -306,4 +341,4 @@ test/
 
 ## License
 
-GPL3
+GPL-3.0-only
