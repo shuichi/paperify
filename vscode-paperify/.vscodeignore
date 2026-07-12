@@ -1,0 +1,11 @@
+# Sources are bundled into dist/extension.js; only dist/, assets/, and the
+# production node_modules (katex, for its CSS and fonts) ship in the VSIX.
+src/**
+test/**
+scripts/**
+.vscode/**
+.gitignore
+esbuild.mjs
+tsconfig.json
+vitest.config.ts
+*.vsix

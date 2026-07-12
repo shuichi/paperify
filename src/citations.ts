@@ -3,6 +3,13 @@ import { createRequire } from 'node:module'
 import type { Plugin } from 'unified'
 
 import { escapeHtml } from './template.js'
+import {
+  CITATION_PATTERN,
+  parseCitationCluster,
+  type CitationItem
+} from './citationSyntax.js'
+
+export { textContainsCitation } from './citationSyntax.js'
 
 const require = createRequire(import.meta.url)
 const Cite = require('citation-js') as new (input: string) => { data: unknown[] }
@@ -18,8 +25,6 @@ const cslLocales = require('@citation-js/plugin-csl/lib/locales.json') as Record
   string
 >
 
-const CITATION_PATTERN = /\[([^[\]\n]*@[^[\]\n]+)\]/g
-const CITATION_KEY_PATTERN = /^@([A-Za-z0-9_:.#$%&+?<>~/-]+)$/
 const PLACEHOLDER_PREFIX = 'PAPERIFY_CITATION_PLACEHOLDER_'
 
 export interface CitationOptions {
@@ -45,10 +50,6 @@ interface CslItem {
   id?: unknown
   'citation-key'?: unknown
   [key: string]: unknown
-}
-
-interface CitationItem {
-  id: string
 }
 
 interface CitationCluster {
@@ -217,17 +218,6 @@ export function applyCitationHtml(
   return html
 }
 
-export function textContainsCitation(value: string): boolean {
-  let match: RegExpExecArray | null
-
-  CITATION_PATTERN.lastIndex = 0
-  while ((match = CITATION_PATTERN.exec(value)) !== null) {
-    if (parseCitationCluster(match[1])) return true
-  }
-
-  return false
-}
-
 function transformTextNodes(node: MdastNode, state: CitationState): void {
   if (!node.children) return
 
@@ -275,24 +265,6 @@ function splitCitationText(
   }
 
   return nodes
-}
-
-function parseCitationCluster(value: string): CitationItem[] | undefined {
-  const parts = value
-    .split(';')
-    .map((part) => part.trim())
-    .filter(Boolean)
-
-  if (parts.length === 0) return undefined
-
-  const items: CitationItem[] = []
-  for (const part of parts) {
-    const match = CITATION_KEY_PATTERN.exec(part)
-    if (!match) return undefined
-    items.push({ id: match[1] })
-  }
-
-  return items
 }
 
 function createCluster(

@@ -41,14 +41,19 @@ import remarkImageFigures from './transforms/figures.js'
 import remarkFigureDirective from './transforms/figureDirective.js'
 import remarkVideoDirective from './transforms/videoDirective.js'
 import sanitizeSchema from './transforms/sanitizeSchema.js'
-import {
-  applyCitationHtml,
-  createCitationState,
-  remarkCitations,
-  renderCitations,
-  type CitationOptions,
-  type CitationState
-} from './citations.js'
+import type { CitationOptions, CitationState } from './citations.js'
+
+/**
+ * The citation stack (citation-js, citeproc, CSL data) is heavy and only
+ * needed when a bibliography is supplied, so it is imported on demand. Hosts
+ * that never pass `citations` (such as the VS Code preview) never load it.
+ */
+type CitationsModule = typeof import('./citations.js')
+
+interface ActiveCitations {
+  module: CitationsModule
+  state: CitationState
+}
 
 export interface ConvertOptions {
   /** How the stylesheet is delivered. Defaults to linking `paperify.css`. */
@@ -79,7 +84,7 @@ export interface ConvertResult {
 function buildProcessor(
   options: ConvertOptions,
   assets: string[],
-  citationState?: CitationState
+  citations?: ActiveCitations
 ) {
   let processor: Processor<any, any, any, any, any> = unified()
     .use(remarkParse)
@@ -90,8 +95,8 @@ function buildProcessor(
     .use(remarkVideoDirective)
     .use(remarkImageFigures)
 
-  if (citationState) {
-    processor = processor.use(remarkCitations(citationState))
+  if (citations) {
+    processor = processor.use(citations.module.remarkCitations(citations.state))
   }
 
   processor = processor
@@ -117,24 +122,29 @@ export async function convert(
   const { content, meta } = parseFrontmatter(markdown)
   const assets: string[] = []
   const lang = options.lang ?? meta.lang ?? 'en'
-  const citationState = options.citations
-    ? createCitationState({
+  let citations: ActiveCitations | undefined
+  if (options.citations) {
+    const module = await import('./citations.js')
+    citations = {
+      module,
+      state: module.createCitationState({
         ...options.citations,
         locale: options.citations.locale ?? lang
       })
-    : undefined
+    }
+  }
 
-  const processor = buildProcessor(options, assets, citationState)
+  const processor = buildProcessor(options, assets, citations)
   const file = await processor.process(content)
   let contentHtml = String(file).trim()
 
   const warnings = file.messages.map((m) => m.reason)
 
-  if (citationState) {
-    const rendered = renderCitations(citationState)
-    contentHtml = applyCitationHtml(
+  if (citations) {
+    const rendered = citations.module.renderCitations(citations.state)
+    contentHtml = citations.module.applyCitationHtml(
       contentHtml,
-      citationState,
+      citations.state,
       rendered.citations
     )
     if (rendered.bibliographyHtml) {

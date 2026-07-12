@@ -1,0 +1,80 @@
+{
+  "name": "paperify-preview",
+  "displayName": "Paperify Preview",
+  "description": "Preview Paperify Markdown documents (paperify: true) as compiled paper-style HTML inside VS Code.",
+  "version": "0.1.0",
+  "publisher": "paperify",
+  "license": "GPL-3.0-only",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shuichi/paperify.git",
+    "directory": "vscode-paperify"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "paperify.openPreview",
+        "title": "Paperify: Open Preview",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "paperify.openPreviewToSide",
+        "title": "Paperify: Open Preview to the Side",
+        "icon": "$(open-preview)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "paperify.openPreviewToSide",
+          "when": "editorLangId == markdown && paperify.isPaperifyDocument",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "paperify.openPreview",
+          "when": "editorLangId == markdown"
+        },
+        {
+          "command": "paperify.openPreviewToSide",
+          "when": "editorLangId == markdown"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "@citation-js/plugin-bibtex": "^0.7.21",
+    "@citation-js/plugin-csl": "^0.7.22",
+    "citation-js": "^0.7.22",
+    "citeproc": "^2.4.63",
+    "katex": "^0.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "@types/vscode": "~1.85.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.25.0",
+    "paperify": "file:..",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}

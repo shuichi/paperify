@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import remarkDirective from 'remark-directive'
 
-import { textContainsCitation } from './citations.js'
+import { textContainsCitation } from './citationSyntax.js'
 
 export interface ExtractTrailingBibtexResult {
   /** Markdown with a terminal bibtex fence removed, when present. */

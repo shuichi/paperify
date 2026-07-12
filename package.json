@@ -19,6 +19,18 @@
   },
   "main": "dist/convert.js",
   "types": "dist/convert.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/convert.d.ts",
+      "default": "./dist/convert.js"
+    },
+    "./api": {
+      "types": "./dist/api.d.ts",
+      "default": "./dist/api.js"
+    },
+    "./styles/paperify.css": "./styles/paperify.css",
+    "./package.json": "./package.json"
+  },
   "files": [
     "dist",
     "styles",

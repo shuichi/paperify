@@ -1,0 +1,308 @@
+/**
+ * render.ts
+ *
+ * Builds the preview HTML for the webview. Deliberately free of any
+ * dependency on the `vscode` module so it can be tested directly.
+ *
+ * The pipeline mirrors the CLI as closely as possible:
+ *
+ *   (extension)    resolves the bibliography exactly like the CLI
+ *                  (frontmatter path, terminal bibtex block, <input>.bib)
+ *   convert()      Paperify Markdown → standalone HTML (CSS embedded,
+ *                  KaTeX rendered statically, citeproc citations,
+ *                  raw HTML disabled)
+ *   compileHtml()  inlines local images, video posters, KaTeX CSS + fonts
+ *   (extension)    rewrites local video/source src to webview URIs
+ *   (extension)    injects a strict Content-Security-Policy
+ */
+
+import fs from 'node:fs'
+import path from 'node:path'
+
+import {
+  DEFAULT_CSL_STYLE,
+  compileHtml,
+  convert,
+  extractTrailingBibtexBlock,
+  fetchCslStyle,
+  isLocalAsset,
+  markdownContainsCitations,
+  parseFrontmatter,
+  resolveBibliographySource,
+  textContainsCitation,
+  type CitationOptions
+} from 'paperify/api'
+
+export interface PreviewRequest {
+  /** Current (possibly unsaved) Markdown source. */
+  markdown: string
+  /** Directory used to resolve local asset references. */
+  inputDir: string
+  /** Absolute path of the document on disk; undefined for untitled files. */
+  documentPath?: string
+  /** The webview's CSP source (`webview.cspSource`). */
+  cspSource: string
+  /** Maps an absolute local file path to a webview-safe URI string. */
+  resolveResource: (absolutePath: string) => string
+}
+
+/**
+ * VS Code prepends a `_defaultStyles` sheet to every webview that themes
+ * plain elements (body, blockquote, code, links, …). Paperify's stylesheet
+ * only overrides the properties it sets itself, so anything else would leak
+ * editor theming into the preview and diverge from CLI output opened in a
+ * browser. This sheet reverts exactly what `_defaultStyles` touches; it is
+ * placed *before* paperify.css, which therefore keeps the final word.
+ */
+const WEBVIEW_RESET_CSS = `/* vscode-webview reset: restore browser default rendering */
+body {
+  margin: revert;
+  padding: revert;
+  background-color: revert;
+  color: revert;
+  font-family: revert;
+  font-weight: revert;
+  font-size: revert;
+}
+img, video { max-width: revert; max-height: revert; }
+a, a code { color: revert; }
+a:hover { color: revert; }
+code {
+  font-family: revert;
+  color: revert;
+  background-color: revert;
+  padding: revert;
+  border-radius: revert;
+}
+pre code { padding: revert; }
+blockquote { background: revert; border-color: revert; }
+kbd {
+  color: revert;
+  background-color: revert;
+  border: revert;
+  border-radius: revert;
+  padding: revert;
+  vertical-align: revert;
+  box-shadow: revert;
+}`
+
+export interface PreviewRenderResult {
+  html: string
+  warnings: string[]
+}
+
+export type PreviewRenderer = (
+  request: PreviewRequest
+) => Promise<PreviewRenderResult>
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function decodeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+}
+
+/**
+ * `compileHtml()` intentionally leaves video/source `src` untouched (they are
+ * not inlined as data URIs). For the webview those local files must be
+ * reachable through a webview resource URI instead.
+ */
+function resolveLocalMediaSources(
+  html: string,
+  inputDir: string,
+  resolveResource: (absolutePath: string) => string,
+  warnings: string[]
+): string {
+  return html.replace(
+    /(<(?:video|source)\b[^>]*?\bsrc=")([^"]*)(")/gi,
+    (match, before: string, src: string, after: string) => {
+      const decoded = decodeHtmlAttribute(src)
+      if (!isLocalAsset(decoded)) return match
+
+      const filePath = path.resolve(inputDir, decoded)
+      if (!fs.existsSync(filePath)) {
+        warnings.push(`video asset not found, left as-is: ${decoded}`)
+        return match
+      }
+
+      return `${before}${escapeHtml(resolveResource(filePath))}${after}`
+    }
+  )
+}
+
+/**
+ * Resolve citations the same way the CLI does: frontmatter `bibliography`,
+ * then a terminal ```bibtex block, then a sibling `<input>.bib`. Where the
+ * CLI hard-fails (missing .bib file, CSL download failure, citations without
+ * a bibliography), the live preview degrades to a warning instead so typing
+ * never breaks the panel.
+ */
+async function resolveCitations(
+  markdownWithoutBibtex: string,
+  embeddedBibtex: string | undefined,
+  request: PreviewRequest,
+  fetchCslXml: (styleId: string) => Promise<string>,
+  warnings: string[]
+): Promise<CitationOptions | undefined> {
+  const { content, meta } = parseFrontmatter(markdownWithoutBibtex)
+  const inputPath =
+    request.documentPath ?? path.join(request.inputDir, 'untitled.md')
+
+  const source = resolveBibliographySource({
+    inputPath,
+    frontmatterBibliography: meta.bibliography,
+    embeddedBibtex
+  })
+
+  if (!source) {
+    if (textContainsCitation(content) && markdownContainsCitations(content)) {
+      warnings.push(
+        'citations found, but no bibliography was provided; add a frontmatter bibliography, a terminal bibtex code block, or a sibling .bib file'
+      )
+    }
+    return undefined
+  }
+
+  let bibtex: string
+  if (source.kind === 'file') {
+    if (!fs.existsSync(source.path)) {
+      warnings.push(`BibTeX file not found, citations disabled: ${source.path}`)
+      return undefined
+    }
+    bibtex = fs.readFileSync(source.path, 'utf8')
+  } else {
+    bibtex = source.bibtex
+  }
+
+  try {
+    const cslXml = await fetchCslXml(DEFAULT_CSL_STYLE)
+    return { bibtex, cslXml, styleId: DEFAULT_CSL_STYLE }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    warnings.push(`citations disabled: ${message}`)
+    return undefined
+  }
+}
+
+function contentSecurityPolicy(cspSource: string): string {
+  return [
+    "default-src 'none'",
+    // Images and KaTeX fonts arrive as data URIs from compileHtml().
+    `img-src data: ${cspSource}`,
+    'font-src data:',
+    // The Paperify stylesheet is embedded as an inline <style> block.
+    "style-src 'unsafe-inline'",
+    // Local video files are served through webview resource URIs.
+    `media-src ${cspSource}`,
+    "script-src 'none'"
+  ].join('; ')
+}
+
+function injectCsp(html: string, cspSource: string): string {
+  const meta = `<meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy(cspSource)}">`
+  return html.replace('<head>', () => `<head>\n  ${meta}`)
+}
+
+/** Render a Paperify document for display inside a webview. */
+export async function renderPreviewHtml(
+  request: PreviewRequest & {
+    css: string
+    /** Test seam; defaults to the CLI's cached Zotero style download. */
+    fetchCslXml?: (styleId: string) => Promise<string>
+  }
+): Promise<PreviewRenderResult> {
+  const fetchCslXml = request.fetchCslXml ?? fetchCslStyle
+  const warnings: string[] = []
+
+  const extracted = extractTrailingBibtexBlock(request.markdown)
+  const citations = await resolveCitations(
+    extracted.markdown,
+    extracted.bibtex,
+    request,
+    fetchCslXml,
+    warnings
+  )
+
+  const converted = await convert(extracted.markdown, {
+    css: {
+      mode: 'embed',
+      content: `${WEBVIEW_RESET_CSS}\n\n${request.css}`
+    },
+    unsafeHtml: false,
+    citations
+  })
+
+  const compiled = compileHtml({
+    html: converted.html,
+    inputDir: request.inputDir
+  })
+
+  const mediaWarnings: string[] = []
+  const withMedia = resolveLocalMediaSources(
+    compiled.html,
+    request.inputDir,
+    request.resolveResource,
+    mediaWarnings
+  )
+
+  return {
+    html: injectCsp(withMedia, request.cspSource),
+    warnings: [
+      ...warnings,
+      ...converted.warnings,
+      ...compiled.warnings,
+      ...mediaWarnings
+    ]
+  }
+}
+
+/** A friendly error screen shown instead of a stack trace. */
+export function renderPreviewErrorHtml(
+  message: string,
+  cspSource: string
+): string {
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Paperify Preview Error</title>
+  <style>
+    body {
+      font-family: var(--vscode-font-family, sans-serif);
+      color: var(--vscode-foreground, #333);
+      padding: 2rem;
+      line-height: 1.6;
+    }
+    h1 { font-size: 1.2rem; }
+    pre {
+      background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.12));
+      padding: 0.75rem 1rem;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    p.hint { opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <h1>Paperify could not render this document</h1>
+  <pre>${escapeHtml(message)}</pre>
+  <p class="hint">The preview will refresh automatically once the document converts again.
+  Full details are in the <strong>Paperify</strong> output channel
+  (View &rarr; Output &rarr; Paperify).</p>
+</body>
+</html>
+`
+  return injectCsp(html, cspSource)
+}

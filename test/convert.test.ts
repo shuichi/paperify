@@ -96,6 +96,28 @@ describe('frontmatter parsing', () => {
 
     expect(meta.bibliography).toBe('references/paper.bib')
   })
+
+  it('accepts only the YAML boolean true for the paperify flag', () => {
+    const flagged = parseFrontmatter('---\npaperify: true\n---\ntext\n')
+    expect(flagged.meta.paperify).toBe(true)
+
+    const disabled = parseFrontmatter('---\npaperify: false\n---\ntext\n')
+    expect(disabled.meta.paperify).toBeUndefined()
+
+    const stringValue = parseFrontmatter('---\npaperify: "true"\n---\ntext\n')
+    expect(stringValue.meta.paperify).toBeUndefined()
+
+    const absent = parseFrontmatter('---\ntitle: T\n---\ntext\n')
+    expect(absent.meta.paperify).toBeUndefined()
+  })
+
+  it('never renders the paperify flag into the generated HTML', async () => {
+    const { html } = await convert(
+      '---\npaperify: true\ntitle: Flagged\n---\n\nBody.\n'
+    )
+    expect(html).toContain('<h1 class="paper-title">Flagged</h1>')
+    expect(html).not.toContain('paperify: true')
+  })
 })
 
 describe('basic Markdown conversion', () => {

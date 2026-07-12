@@ -25,6 +25,11 @@ export interface PaperMeta {
   bibliography?: string
   headerTemplate?: string
   footerTemplate?: string
+  /**
+   * Opt-in flag for integrations such as the VS Code preview. Only the YAML
+   * boolean `true` counts; it is never rendered into the generated HTML.
+   */
+  paperify?: boolean
 }
 
 export interface FrontmatterResult {
@@ -108,7 +113,8 @@ export function parseFrontmatter(source: string): FrontmatterResult {
     lang: asString(data.lang ?? data.language),
     bibliography: asString(data.bibliography),
     headerTemplate: asString(data.headerTemplate),
-    footerTemplate: asString(data.footerTemplate)
+    footerTemplate: asString(data.footerTemplate),
+    paperify: data.paperify === true ? true : undefined
   }
 
   return { content: parsed.content, meta }

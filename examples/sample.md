@@ -1,4 +1,5 @@
 ---
+paperify: true
 title: "A Lightweight Markdown-to-HTML Paper Converter"
 subtitle: "CSS-first academic publishing for web and print"
 authors:

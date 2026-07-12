@@ -26,7 +26,14 @@ same compiled HTML in Puppeteer/Chromium and printing it with `print` media.
 The codebase is intentionally small. Main responsibilities:
 
 - `src/cli.ts`: argument parsing, watch mode, style loading, HTML/PDF build orchestration.
+- `src/api.ts`: the supported embedding API (`paperify/api`) re-exporting
+  `convert`, `compileHtml`, `parseFrontmatter`, bibliography/CSL resolution,
+  and style loading for hosts such as the VS Code extension. CLI-only
+  concerns (argument parsing, PDF/Puppeteer) must stay out of this module.
 - `src/convert.ts`: Markdown to HTML conversion through the unified pipeline.
+  The citation stack is imported lazily, only when `citations` are supplied.
+- `src/citationSyntax.ts`: pure `[@key]` syntax recognition, shared by
+  `citations.ts` and `bibliography.ts` without loading citation-js/citeproc.
 - `src/frontmatter.ts`: YAML frontmatter parsing and metadata normalization.
 - `src/template.ts`: final standalone HTML document assembly.
 - `src/compile.ts`: local image/poster and KaTeX CSS/font inlining for compiled HTML.
@@ -75,6 +82,8 @@ Supported fields:
 - `lang` or `language`
 - `headerTemplate`
 - `footerTemplate`
+- `paperify` (opt-in flag for integrations such as the VS Code preview; only
+  the YAML boolean `true` counts, and it is never rendered into the HTML)
 
 Authors may be plain strings or objects with `name`, `affiliation`, and
 `email`. Keywords may be an array or a comma-separated string. YAML date objects
@@ -234,6 +243,15 @@ product change:
 - Keep visual behavior in CSS where possible.
 - Preserve accessibility basics such as image `alt` text.
 - Prefer warnings over hard failures for missing optional media assets.
+
+## VS Code Extension
+
+`vscode-paperify/` is a self-contained VS Code extension that previews
+Markdown documents whose frontmatter contains the YAML boolean
+`paperify: true`. It reuses the pipeline through `paperify/api` (bundled with
+esbuild) and must never include Puppeteer, Chromium, or PDF code. It has its
+own `package.json`, tests (`npm test`), and build (`npm run build`); build the
+root package first so `dist/` exists. See `vscode-paperify/README.md`.
 
 ## Testing Guidance
 
