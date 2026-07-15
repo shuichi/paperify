@@ -47,6 +47,12 @@ export const ViewColumn = {
   Two: 2
 } as const
 
+export const ProgressLocation = {
+  SourceControl: 1,
+  Window: 10,
+  Notification: 15
+} as const
+
 export class MockWebviewPanel {
   readonly webview: {
     html: string
@@ -112,26 +118,44 @@ function createMockOutputChannel(name: string): MockOutputChannel {
 export const __mock = {
   panels: [] as MockWebviewPanel[],
   messages: [] as string[],
+  errorMessages: [] as Array<{ message: string; items: string[] }>,
   outputChannels: [] as MockOutputChannel[],
   contextValues: new Map<string, unknown>(),
   registeredCommands: new Map<string, (...args: unknown[]) => unknown>(),
+  executedCommands: [] as unknown[][],
   changeTextDocument: new MockEmitter<{ document: unknown }>(),
   closeTextDocument: new MockEmitter<unknown>(),
   changeActiveTextEditor: new MockEmitter<unknown>(),
   activeTextEditor: undefined as unknown,
   workspaceFolders: undefined as unknown,
+  configuration: new Map<string, unknown>(),
+  saveDialogCalls: [] as unknown[],
+  saveDialogResult: undefined as Uri | undefined,
+  progressCalls: [] as unknown[],
+  infoMessageChoice: undefined as string | undefined,
+  errorMessageChoice: undefined as string | undefined,
+  openedExternal: [] as Uri[],
 
   reset(): void {
     this.panels = []
     this.messages = []
+    this.errorMessages = []
     this.outputChannels = []
     this.contextValues.clear()
     this.registeredCommands.clear()
+    this.executedCommands = []
     this.changeTextDocument.listeners.clear()
     this.closeTextDocument.listeners.clear()
     this.changeActiveTextEditor.listeners.clear()
     this.activeTextEditor = undefined
     this.workspaceFolders = undefined
+    this.configuration.clear()
+    this.saveDialogCalls = []
+    this.saveDialogResult = undefined
+    this.progressCalls = []
+    this.infoMessageChoice = undefined
+    this.errorMessageChoice = undefined
+    this.openedExternal = []
   }
 }
 
@@ -149,9 +173,21 @@ export const window = {
     __mock.panels.push(panel)
     return panel
   },
-  showInformationMessage(message: string): Promise<undefined> {
+  showInformationMessage(message: string): Promise<string | undefined> {
     __mock.messages.push(message)
-    return Promise.resolve(undefined)
+    return Promise.resolve(__mock.infoMessageChoice)
+  },
+  showErrorMessage(message: string, ...items: string[]): Promise<string | undefined> {
+    __mock.errorMessages.push({ message, items })
+    return Promise.resolve(__mock.errorMessageChoice)
+  },
+  showSaveDialog(options: unknown): Promise<Uri | undefined> {
+    __mock.saveDialogCalls.push(options)
+    return Promise.resolve(__mock.saveDialogResult)
+  },
+  withProgress<T>(options: unknown, task: () => Promise<T>): Promise<T> {
+    __mock.progressCalls.push(options)
+    return Promise.resolve(task())
   },
   createOutputChannel(name: string): MockOutputChannel {
     const channel = createMockOutputChannel(name)
@@ -162,6 +198,13 @@ export const window = {
     __mock.changeActiveTextEditor.event(listener)
 }
 
+export const env = {
+  openExternal(uri: Uri): Promise<boolean> {
+    __mock.openedExternal.push(uri)
+    return Promise.resolve(true)
+  }
+}
+
 export const workspace = {
   get workspaceFolders() {
     return __mock.workspaceFolders
@@ -169,7 +212,18 @@ export const workspace = {
   onDidChangeTextDocument: (listener: Listener<{ document: unknown }>) =>
     __mock.changeTextDocument.event(listener),
   onDidCloseTextDocument: (listener: Listener<unknown>) =>
-    __mock.closeTextDocument.event(listener)
+    __mock.closeTextDocument.event(listener),
+  getConfiguration(section: string) {
+    return {
+      get<T>(key: string, defaultValue?: T): T | undefined {
+        const qualified = `${section}.${key}`
+        if (__mock.configuration.has(qualified)) {
+          return __mock.configuration.get(qualified) as T
+        }
+        return defaultValue
+      }
+    }
+  }
 }
 
 export const commands = {
@@ -181,6 +235,7 @@ export const commands = {
     return { dispose: () => void __mock.registeredCommands.delete(id) }
   },
   executeCommand(id: string, ...args: unknown[]): Promise<unknown> {
+    __mock.executedCommands.push([id, ...args])
     if (id === 'setContext') {
       __mock.contextValues.set(String(args[0]), args[1])
       return Promise.resolve(undefined)

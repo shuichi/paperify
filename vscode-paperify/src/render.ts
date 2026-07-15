@@ -4,34 +4,22 @@
  * Builds the preview HTML for the webview. Deliberately free of any
  * dependency on the `vscode` module so it can be tested directly.
  *
- * The pipeline mirrors the CLI as closely as possible:
+ * The Markdown -> compiled standalone HTML pipeline is shared with PDF
+ * export (build.ts); this module adds only the webview-specific layers:
  *
- *   (extension)    resolves the bibliography exactly like the CLI
- *                  (frontmatter path, terminal bibtex block, <input>.bib)
- *   convert()      Paperify Markdown → standalone HTML (CSS embedded,
- *                  KaTeX rendered statically, citeproc citations,
- *                  raw HTML disabled)
- *   compileHtml()  inlines local images, video posters, KaTeX CSS + fonts
- *   (extension)    rewrites local video/source src to webview URIs
- *   (extension)    injects a strict Content-Security-Policy
+ *   buildCompiledHtml()  shared pipeline, citations degrade to warnings
+ *   (here)               reverts VS Code's webview default styles via a
+ *                        reset stylesheet placed before paperify.css
+ *   (here)               rewrites local video/source src to webview URIs
+ *   (here)               injects a strict Content-Security-Policy
  */
 
 import fs from 'node:fs'
 import path from 'node:path'
 
-import {
-  DEFAULT_CSL_STYLE,
-  compileHtml,
-  convert,
-  extractTrailingBibtexBlock,
-  fetchCslStyle,
-  isLocalAsset,
-  markdownContainsCitations,
-  parseFrontmatter,
-  resolveBibliographySource,
-  textContainsCitation,
-  type CitationOptions
-} from 'paperify/api'
+import { isLocalAsset } from 'paperify/api'
+
+import { buildCompiledHtml } from './build'
 
 export interface PreviewRequest {
   /** Current (possibly unsaved) Markdown source. */
@@ -141,60 +129,6 @@ function resolveLocalMediaSources(
   )
 }
 
-/**
- * Resolve citations the same way the CLI does: frontmatter `bibliography`,
- * then a terminal ```bibtex block, then a sibling `<input>.bib`. Where the
- * CLI hard-fails (missing .bib file, CSL download failure, citations without
- * a bibliography), the live preview degrades to a warning instead so typing
- * never breaks the panel.
- */
-async function resolveCitations(
-  markdownWithoutBibtex: string,
-  embeddedBibtex: string | undefined,
-  request: PreviewRequest,
-  fetchCslXml: (styleId: string) => Promise<string>,
-  warnings: string[]
-): Promise<CitationOptions | undefined> {
-  const { content, meta } = parseFrontmatter(markdownWithoutBibtex)
-  const inputPath =
-    request.documentPath ?? path.join(request.inputDir, 'untitled.md')
-
-  const source = resolveBibliographySource({
-    inputPath,
-    frontmatterBibliography: meta.bibliography,
-    embeddedBibtex
-  })
-
-  if (!source) {
-    if (textContainsCitation(content) && markdownContainsCitations(content)) {
-      warnings.push(
-        'citations found, but no bibliography was provided; add a frontmatter bibliography, a terminal bibtex code block, or a sibling .bib file'
-      )
-    }
-    return undefined
-  }
-
-  let bibtex: string
-  if (source.kind === 'file') {
-    if (!fs.existsSync(source.path)) {
-      warnings.push(`BibTeX file not found, citations disabled: ${source.path}`)
-      return undefined
-    }
-    bibtex = fs.readFileSync(source.path, 'utf8')
-  } else {
-    bibtex = source.bibtex
-  }
-
-  try {
-    const cslXml = await fetchCslXml(DEFAULT_CSL_STYLE)
-    return { bibtex, cslXml, styleId: DEFAULT_CSL_STYLE }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    warnings.push(`citations disabled: ${message}`)
-    return undefined
-  }
-}
-
 function contentSecurityPolicy(cspSource: string): string {
   return [
     "default-src 'none'",
@@ -222,35 +156,17 @@ export async function renderPreviewHtml(
     fetchCslXml?: (styleId: string) => Promise<string>
   }
 ): Promise<PreviewRenderResult> {
-  const fetchCslXml = request.fetchCslXml ?? fetchCslStyle
-  const warnings: string[] = []
-
-  const extracted = extractTrailingBibtexBlock(request.markdown)
-  const citations = await resolveCitations(
-    extracted.markdown,
-    extracted.bibtex,
-    request,
-    fetchCslXml,
-    warnings
-  )
-
-  const converted = await convert(extracted.markdown, {
-    css: {
-      mode: 'embed',
-      content: `${WEBVIEW_RESET_CSS}\n\n${request.css}`
-    },
-    unsafeHtml: false,
-    citations
-  })
-
-  const compiled = compileHtml({
-    html: converted.html,
-    inputDir: request.inputDir
+  const built = await buildCompiledHtml({
+    markdown: request.markdown,
+    inputDir: request.inputDir,
+    documentPath: request.documentPath,
+    css: `${WEBVIEW_RESET_CSS}\n\n${request.css}`,
+    fetchCslXml: request.fetchCslXml
   })
 
   const mediaWarnings: string[] = []
   const withMedia = resolveLocalMediaSources(
-    compiled.html,
+    built.html,
     request.inputDir,
     request.resolveResource,
     mediaWarnings
@@ -258,12 +174,7 @@ export async function renderPreviewHtml(
 
   return {
     html: injectCsp(withMedia, request.cspSource),
-    warnings: [
-      ...warnings,
-      ...converted.warnings,
-      ...compiled.warnings,
-      ...mediaWarnings
-    ]
+    warnings: [...built.warnings, ...mediaWarnings]
   }
 }
 

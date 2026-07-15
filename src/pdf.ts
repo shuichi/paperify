@@ -1,21 +1,63 @@
 /**
  * pdf.ts
  *
- * Renders Paperify HTML to PDF through Puppeteer's Chromium engine.
+ * Renders Paperify HTML to PDF through a Chromium-based browser driven by a
+ * Puppeteer-compatible launcher supplied by the host: the CLI passes full
+ * `puppeteer`, the VS Code extension passes `puppeteer-core` pointed at a
+ * locally installed Chrome/Edge/Chromium. This module itself never imports
+ * a Puppeteer implementation, so hosts control exactly what ships.
+ *
  * The Markdown -> compiled HTML pipeline remains unchanged; this module only
- * opens the compiled HTML file and asks Chromium to print it.
+ * opens the compiled HTML file and asks the browser to print it.
  */
 
 import { pathToFileURL } from 'node:url'
 
-import type { PDFOptions } from 'puppeteer'
+/** The subset of Puppeteer's PDFOptions that Paperify produces. */
+export interface PaperifyPdfOptions {
+  path: string
+  printBackground: boolean
+  preferCSSPageSize: boolean
+  waitForFonts: boolean
+  displayHeaderFooter?: boolean
+  headerTemplate?: string
+  footerTemplate?: string
+}
+
+/**
+ * Structural slices of the Puppeteer API used for rendering. Both
+ * `puppeteer` and `puppeteer-core` satisfy them, and tests can substitute
+ * lightweight fakes without either package.
+ */
+export interface PdfBrowserPage {
+  emulateMediaType(type: 'print'): Promise<unknown>
+  goto(
+    url: string,
+    options: { waitUntil: Array<'load' | 'domcontentloaded'> }
+  ): Promise<unknown>
+  waitForNetworkIdle(options: {
+    idleTime: number
+    timeout: number
+  }): Promise<unknown>
+  bringToFront(): Promise<unknown>
+  pdf(options: PaperifyPdfOptions): Promise<unknown>
+}
+
+export interface PdfBrowser {
+  newPage(): Promise<PdfBrowserPage>
+  close(): Promise<unknown>
+}
+
+export type PdfBrowserLauncher = (options: {
+  executablePath?: string
+}) => Promise<PdfBrowser>
 
 export interface RenderPdfOptions {
   /** Compiled Paperify HTML path. */
   htmlPath: string
   /** Destination PDF path. */
   outputPath: string
-  /** Optional Chromium/Chrome executable path for Puppeteer. */
+  /** Optional Chromium/Chrome executable path for the launcher. */
   browserExecutablePath?: string
   /** Puppeteer HTML template for the print header. */
   headerTemplate?: string
@@ -23,26 +65,46 @@ export interface RenderPdfOptions {
   footerTemplate?: string
 }
 
-function asPdfError(error: unknown): Error {
-  const message = error instanceof Error ? error.message : String(error)
-  if (
+export interface RenderPdfRuntime {
+  /** Launches the browser; hosts supply puppeteer or puppeteer-core. */
+  launch: PdfBrowserLauncher
+  /**
+   * Host-specific guidance appended when the browser cannot be found or
+   * launched. Defaults to the CLI's Puppeteer instructions.
+   */
+  missingBrowserHelp?: string
+}
+
+/** Raised when the browser itself could not be found or launched. */
+export class BrowserLaunchError extends Error {}
+
+const DEFAULT_MISSING_BROWSER_HELP =
+  'Puppeteer could not find or launch a local browser. Run ' +
+  '`npx puppeteer browsers install chrome`, or pass ' +
+  '`--browser-executable <path>`, and try again.'
+
+function isMissingBrowserMessage(message: string): boolean {
+  return (
     message.includes('Could not find Chrome') ||
     message.includes('Could not find Chromium') ||
+    message.includes('Could not find Google Chrome') ||
     message.includes('Browser was not found') ||
     message.includes('Failed to launch the browser process')
-  ) {
-    return new Error(
-      `${message}\n\nPuppeteer could not find or launch a local browser. Run ` +
-        '`npx puppeteer browsers install chrome`, or pass ' +
-        '`--browser-executable <path>`, and try again.'
-    )
+  )
+}
+
+function asPdfError(error: unknown, help: string): Error {
+  if (error instanceof BrowserLaunchError) return error
+  const message = error instanceof Error ? error.message : String(error)
+  if (isMissingBrowserMessage(message)) {
+    return new BrowserLaunchError(`${message}\n\n${help}`)
   }
   return error instanceof Error ? error : new Error(message)
 }
 
-export function buildPdfOptions(options: RenderPdfOptions): PDFOptions {
+export function buildPdfOptions(options: RenderPdfOptions): PaperifyPdfOptions {
   const hasHeaderFooter = Boolean(options.headerTemplate || options.footerTemplate)
-  const pdfOptions: PDFOptions = {
+  const pdfOptions: PaperifyPdfOptions = {
     path: options.outputPath,
     printBackground: true,
     preferCSSPageSize: true,
@@ -58,10 +120,13 @@ export function buildPdfOptions(options: RenderPdfOptions): PDFOptions {
   return pdfOptions
 }
 
-export async function renderPdf(options: RenderPdfOptions): Promise<void> {
+export async function renderPdf(
+  options: RenderPdfOptions,
+  runtime: RenderPdfRuntime
+): Promise<void> {
+  const help = runtime.missingBrowserHelp ?? DEFAULT_MISSING_BROWSER_HELP
   try {
-    const { default: puppeteer } = await import('puppeteer')
-    const browser = await puppeteer.launch({
+    const browser = await runtime.launch({
       executablePath: options.browserExecutablePath
     })
 
@@ -79,6 +144,6 @@ export async function renderPdf(options: RenderPdfOptions): Promise<void> {
       await browser.close()
     }
   } catch (error) {
-    throw asPdfError(error)
+    throw asPdfError(error, help)
   }
 }

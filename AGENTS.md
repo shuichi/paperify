@@ -29,7 +29,8 @@ The codebase is intentionally small. Main responsibilities:
 - `src/api.ts`: the supported embedding API (`paperify/api`) re-exporting
   `convert`, `compileHtml`, `parseFrontmatter`, bibliography/CSL resolution,
   and style loading for hosts such as the VS Code extension. CLI-only
-  concerns (argument parsing, PDF/Puppeteer) must stay out of this module.
+  concerns (argument parsing) and PDF rendering must stay out of this module;
+  PDF lives in the separate opt-in `paperify/pdf` subpath.
 - `src/convert.ts`: Markdown to HTML conversion through the unified pipeline.
   The citation stack is imported lazily, only when `citations` are supplied.
 - `src/citationSyntax.ts`: pure `[@key]` syntax recognition, shared by
@@ -37,7 +38,10 @@ The codebase is intentionally small. Main responsibilities:
 - `src/frontmatter.ts`: YAML frontmatter parsing and metadata normalization.
 - `src/template.ts`: final standalone HTML document assembly.
 - `src/compile.ts`: local image/poster and KaTeX CSS/font inlining for compiled HTML.
-- `src/pdf.ts`: Puppeteer/Chromium PDF rendering.
+- `src/pdf.ts`: Chromium PDF rendering (`paperify/pdf`). The Puppeteer
+  implementation is injected by the host: the CLI passes full `puppeteer`,
+  the VS Code extension passes `puppeteer-core` with a locally installed
+  browser. This module must not import a Puppeteer package itself.
 - `src/assets.ts`: local asset collection and optional copying for `--copy-assets`.
 - `src/styleSources.ts`: bundled and custom CSS resolution.
 - `src/transforms/*.ts`: Paperify-specific Markdown transforms and raw HTML schema.
@@ -215,7 +219,7 @@ stylesheet.
 When the CLI output path ends in `.pdf`, it first writes a sibling `.html` file
 and then renders that HTML to PDF through `src/pdf.ts`.
 
-PDF rendering uses Puppeteer with:
+PDF rendering uses the Puppeteer API with:
 
 - `printBackground: true`
 - `preferCSSPageSize: true`
@@ -225,9 +229,14 @@ PDF rendering uses Puppeteer with:
 Header and footer rendering remain disabled unless `headerTemplate` or
 `footerTemplate` is provided in frontmatter.
 
-If Puppeteer cannot find or launch Chrome/Chromium, preserve the existing error
-guidance that suggests installing Puppeteer's browser or using
-`--browser-executable`.
+`src/pdf.ts` is exported as `paperify/pdf` and takes the browser launcher as
+a parameter (`RenderPdfRuntime`), so it never imports `puppeteer` or
+`puppeteer-core` itself. The CLI injects full `puppeteer`; the VS Code
+extension injects `puppeteer-core` resolved against the user's local
+Chrome/Edge/Chromium. Browser-not-found failures are raised as
+`BrowserLaunchError` with host-specific guidance (`missingBrowserHelp`); for
+the CLI, preserve the existing message that suggests installing Puppeteer's
+browser or using `--browser-executable`.
 
 ## Design Boundaries
 
@@ -248,10 +257,16 @@ product change:
 
 `vscode-paperify/` is a self-contained VS Code extension that previews
 Markdown documents whose frontmatter contains the YAML boolean
-`paperify: true`. It reuses the pipeline through `paperify/api` (bundled with
-esbuild) and must never include Puppeteer, Chromium, or PDF code. It has its
-own `package.json`, tests (`npm test`), and build (`npm run build`); build the
-root package first so `dist/` exists. See `vscode-paperify/README.md`.
+`paperify: true` and exports them to PDF. It reuses the pipeline through
+`paperify/api` and the PDF renderer through `paperify/pdf` (both bundled with
+esbuild). PDF export drives the user's locally installed Chrome, Edge, or
+Chromium through `puppeteer-core` — auto-detected, or set via the
+`paperify.pdf.browserExecutable` setting. The extension must never bundle a
+browser binary (no full `puppeteer`, no downloaded Chromium in the VSIX);
+`puppeteer-core` stays a devDependency compiled into `dist/extension.js` so
+vsce does not package its node_modules tree. It has its own `package.json`,
+tests (`npm test`), and build (`npm run build`); build the root package first
+so `dist/` exists. See `vscode-paperify/README.md`.
 
 ## Testing Guidance
 

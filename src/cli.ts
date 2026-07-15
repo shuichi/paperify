@@ -281,15 +281,21 @@ async function buildOnce(options: CliOptions): Promise<void> {
   fs.writeFileSync(compiledHtmlPath, compiled.html, 'utf8')
 
   if (outputIsPdf) {
-    await renderPdf({
-      htmlPath: compiledHtmlPath,
-      outputPath: path.resolve(options.output),
-      browserExecutablePath: options.browserExecutable
-        ? path.resolve(options.browserExecutable)
-        : undefined,
-      headerTemplate: result.meta.headerTemplate,
-      footerTemplate: result.meta.footerTemplate
-    })
+    // The CLI supplies full puppeteer (with its managed browser downloads);
+    // other hosts of paperify/pdf inject their own launcher instead.
+    const { default: puppeteer } = await import('puppeteer')
+    await renderPdf(
+      {
+        htmlPath: compiledHtmlPath,
+        outputPath: path.resolve(options.output),
+        browserExecutablePath: options.browserExecutable
+          ? path.resolve(options.browserExecutable)
+          : undefined,
+        headerTemplate: result.meta.headerTemplate,
+        footerTemplate: result.meta.footerTemplate
+      },
+      { launch: (launchOptions) => puppeteer.launch(launchOptions) }
+    )
   }
 
   for (const warning of [...result.warnings, ...compiled.warnings]) {

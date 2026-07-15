@@ -10,6 +10,7 @@ import path from 'node:path'
 import * as vscode from 'vscode'
 
 import { isPaperifyDocument } from './detect'
+import { documentDir, documentPath, fallbackInputDir } from './documentPaths'
 import { renderPreviewErrorHtml, type PreviewRenderer } from './render'
 
 export const NOT_PAPERIFY_MESSAGE =
@@ -27,20 +28,6 @@ interface PreviewEntry {
   timer: ReturnType<typeof setTimeout> | undefined
   disposed: boolean
   lastLoggedWarnings: string
-}
-
-function documentPath(document: vscode.TextDocument): string | undefined {
-  if (document.isUntitled || document.uri.scheme !== 'file') return undefined
-  return document.uri.fsPath
-}
-
-function documentDir(document: vscode.TextDocument): string | undefined {
-  const filePath = documentPath(document)
-  return filePath === undefined ? undefined : path.dirname(filePath)
-}
-
-function fallbackInputDir(): string {
-  return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd()
 }
 
 function previewTitle(document: vscode.TextDocument): string {

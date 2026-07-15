@@ -1,9 +1,9 @@
 /**
  * extension.ts
  *
- * Activation glue: registers the preview commands, maintains the
- * `paperify.isPaperifyDocument` context key that gates the editor-title
- * button, and wires the Paperify renderer to the preview manager.
+ * Activation glue: registers the preview and PDF export commands, maintains
+ * the `paperify.isPaperifyDocument` context key that gates the editor-title
+ * buttons, and wires the Paperify renderer to the preview manager.
  */
 
 import path from 'node:path'
@@ -11,25 +11,30 @@ import * as vscode from 'vscode'
 
 import { readStyleBundle } from 'paperify/api'
 import { isPaperifyDocument } from './detect'
+import { PdfExportController } from './exportController'
 import { PreviewManager } from './preview'
 import { renderPreviewHtml, type PreviewRenderer } from './render'
 
 const CONTEXT_KEY = 'paperify.isPaperifyDocument'
 const CONTEXT_DEBOUNCE_MS = 200
 
-function createRenderer(context: vscode.ExtensionContext): PreviewRenderer {
+function createCssLoader(context: vscode.ExtensionContext): () => string {
   let css: string | undefined
-  return async (request) => {
-    css ??= readStyleBundle({
+  return () =>
+    (css ??= readStyleBundle({
       cssFile: context.asAbsolutePath(path.join('assets', 'paperify.css'))
-    }).content
-    return renderPreviewHtml({ ...request, css })
-  }
+    }).content)
+}
+
+function createRenderer(loadCss: () => string): PreviewRenderer {
+  return (request) => renderPreviewHtml({ ...request, css: loadCss() })
 }
 
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel('Paperify')
-  const manager = new PreviewManager(output, createRenderer(context))
+  const loadCss = createCssLoader(context)
+  const manager = new PreviewManager(output, createRenderer(loadCss))
+  const pdfExport = new PdfExportController(output, loadCss)
 
   let contextTimer: ReturnType<typeof setTimeout> | undefined
   let lastContextValue: boolean | undefined
@@ -67,12 +72,23 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     output,
     manager,
+    pdfExport,
     vscode.commands.registerCommand('paperify.openPreview', () =>
       openFromActiveEditor(vscode.ViewColumn.Active)
     ),
     vscode.commands.registerCommand('paperify.openPreviewToSide', () =>
       openFromActiveEditor(vscode.ViewColumn.Beside)
     ),
+    vscode.commands.registerCommand('paperify.exportPdf', () => {
+      const editor = vscode.window.activeTextEditor
+      if (!editor) {
+        void vscode.window.showInformationMessage(
+          'Open a Markdown document to export a Paperify PDF.'
+        )
+        return
+      }
+      void pdfExport.exportDocument(editor.document)
+    }),
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       if (contextTimer !== undefined) {
         clearTimeout(contextTimer)

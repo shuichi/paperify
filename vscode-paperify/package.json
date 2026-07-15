@@ -1,18 +1,23 @@
 {
   "name": "paperify-preview",
   "displayName": "Paperify Preview",
-  "description": "Preview Paperify Markdown documents (paperify: true) as compiled paper-style HTML inside VS Code.",
-  "version": "0.1.0",
+  "description": "Preview Paperify Markdown documents (paperify: true) as compiled paper-style HTML inside VS Code, and export them to PDF.",
+  "version": "0.2.0",
   "publisher": "paperify",
   "license": "GPL-3.0-only",
   "private": true,
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#16243a",
+    "theme": "dark"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/shuichi/paperify.git",
     "directory": "vscode-paperify"
   },
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.101.0"
   },
   "categories": [
     "Other"
@@ -32,12 +37,22 @@
         "command": "paperify.openPreviewToSide",
         "title": "Paperify: Open Preview to the Side",
         "icon": "$(open-preview)"
+      },
+      {
+        "command": "paperify.exportPdf",
+        "title": "Paperify: Export PDF",
+        "icon": "$(file-pdf)"
       }
     ],
     "menus": {
       "editor/title": [
         {
           "command": "paperify.openPreviewToSide",
+          "when": "editorLangId == markdown && paperify.isPaperifyDocument",
+          "group": "navigation"
+        },
+        {
+          "command": "paperify.exportPdf",
           "when": "editorLangId == markdown && paperify.isPaperifyDocument",
           "group": "navigation"
         }
@@ -50,8 +65,22 @@
         {
           "command": "paperify.openPreviewToSide",
           "when": "editorLangId == markdown"
+        },
+        {
+          "command": "paperify.exportPdf",
+          "when": "editorLangId == markdown"
         }
       ]
+    },
+    "configuration": {
+      "title": "Paperify",
+      "properties": {
+        "paperify.pdf.browserExecutable": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to a Chrome, Edge, or Chromium executable used for PDF export. Leave empty to auto-detect a locally installed browser."
+        }
+      }
     }
   },
   "scripts": {
@@ -70,10 +99,11 @@
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
-    "@types/vscode": "~1.85.0",
+    "@types/vscode": "~1.101.0",
     "@vscode/vsce": "^3.0.0",
     "esbuild": "^0.25.0",
     "paperify": "file:..",
+    "puppeteer-core": "^25.3.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"
   }

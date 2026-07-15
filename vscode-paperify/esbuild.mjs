@@ -2,8 +2,12 @@
  * esbuild.mjs
  *
  * Bundles the extension into a single CommonJS file for the VS Code
- * extension host. The Paperify pipeline (paperify/api) is compiled into the
- * bundle, so the extension has no runtime dependency on the parent package.
+ * extension host. The Paperify pipeline (paperify/api), the PDF renderer
+ * (paperify/pdf), and `puppeteer-core` are compiled into the bundle, so the
+ * extension has no runtime dependency on the parent package and vsce never
+ * packages the puppeteer-core node_modules tree (puppeteer-core is therefore
+ * a devDependency, like `paperify` itself). No browser binary ships in the
+ * VSIX; PDF export drives the user's locally installed Chrome/Edge/Chromium.
  *
  * Two things are resolved at runtime instead of being bundled:
  *
@@ -41,7 +45,7 @@ await esbuild.build({
   bundle: true,
   platform: 'node',
   format: 'cjs',
-  target: 'node18',
+  target: 'node22',
   external: ['vscode'],
   minify: true,
   sourcemap: false,

@@ -1,8 +1,8 @@
 # Paperify Preview for VS Code
 
 Preview [Paperify](https://github.com/shuichi/paperify) Markdown documents as
-compiled paper-style HTML inside VS Code — without leaving your editor and
-without changing how you edit normal Markdown.
+compiled paper-style HTML inside VS Code, and export them to print-ready PDF —
+without leaving your editor and without changing how you edit normal Markdown.
 
 Only documents that explicitly opt in with the YAML boolean `paperify: true`
 are treated as Paperify documents:
@@ -29,10 +29,11 @@ does not replace the built-in Markdown preview.
 
 - **Paperify: Open Preview** (`paperify.openPreview`)
 - **Paperify: Open Preview to the Side** (`paperify.openPreviewToSide`)
+- **Paperify: Export PDF** (`paperify.exportPdf`)
 
-An editor-title preview button appears only when the active document is a
-Paperify document. Running a command on a non-Paperify document shows a short
-hint instead of opening a panel.
+Editor-title buttons (preview and PDF export) appear only when the active
+document is a Paperify document. Running a command on a non-Paperify document
+shows a short hint instead.
 
 ## What the preview shows
 
@@ -57,6 +58,34 @@ matches CLI output as closely as a webview allows:
 
 The preview updates live from unsaved editor content (debounced), and stale
 async renders can never overwrite newer ones.
+
+## PDF export
+
+**Paperify: Export PDF** renders the current editor content (saved or not)
+to a print-ready PDF, exactly like the CLI's `paperify input.md -o output.pdf`:
+
+- The same compiled standalone HTML is generated first (Paperify CSS, static
+  KaTeX, inlined images/posters, citeproc citations — with the webview-only
+  reset CSS, resource URIs, and CSP left out), written to a private temp
+  directory, printed, and cleaned up afterwards. A failed export never leaves
+  a partial PDF or temp files behind.
+- Print options match the CLI: `printBackground`, `preferCSSPageSize`,
+  `waitForFonts`, `print` media emulation, and frontmatter
+  `headerTemplate`/`footerTemplate`.
+- Citation problems fail the export with an error (like the CLI), rather than
+  degrading to a warning like the live preview — an exported paper should
+  never silently drop its citations.
+- A save dialog picks the destination (defaulting to `<input>.pdf` next to
+  the document), a progress notification shows while printing, and duplicate
+  exports of the same document are blocked.
+
+PDF rendering needs a locally installed **Chrome, Edge, or Chromium**. The
+extension ships no browser (and no full Puppeteer): it drives your local
+browser through `puppeteer-core`. The executable is auto-detected from
+standard install locations; if yours lives elsewhere, set:
+
+- `paperify.pdf.browserExecutable` — absolute path to the browser executable
+  used for PDF export.
 
 ## Security
 
@@ -96,16 +125,21 @@ npm run package
 code --install-extension paperify-preview-*.vsix
 ```
 
-The bundle contains no Puppeteer, Chromium, or PDF code. The packaged
-runtime dependencies are `katex` (stylesheet and fonts) and the citation
-stack (`citation-js`, `citeproc`, CSL plugins), which is loaded lazily and
-only for documents that actually have a bibliography.
+The bundle contains no browser binary and no full Puppeteer. PDF rendering
+uses `puppeteer-core` (compiled into the bundle) against your locally
+installed Chrome/Edge/Chromium. The packaged runtime dependencies are `katex`
+(stylesheet and fonts) and the citation stack (`citation-js`, `citeproc`,
+CSL plugins), which is loaded lazily and only for documents that actually
+have a bibliography.
+
+Requires VS Code 1.101 or later (its extension host provides the Node.js 22
+runtime that `puppeteer-core` needs).
 
 ## Out of scope (MVP)
 
-- Choosing a CSL style (the preview always uses the CLI default,
+- Choosing a CSL style (preview and PDF export always use the CLI default,
   `computing-surveys`; use the CLI's `--csl` for other styles)
-- PDF output, print settings UI
+- Print settings UI beyond frontmatter `headerTemplate`/`footerTemplate`
 - Scroll sync, outline view, completions
 - External (http/https) images — blocked by the CSP
 - A Paperify-specific language ID or custom editor

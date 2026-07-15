@@ -21,7 +21,7 @@ keywords:
   - HTML
   - CSS
   - academic publishing
-bibliograhy: sample.bib
+bibliography: sample.bib
 headerTemplate: |
   <div style="font-family:'Noto Sans JP', sans-serif;font-size:8px;width:100%;text-align:center"></div>
 footerTemplate: |
