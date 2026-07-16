@@ -16,6 +16,7 @@ import { convert } from './convert.js'
 import { copyAssets } from './assets.js'
 import { compileHtml } from './compile.js'
 import { renderPdf } from './pdf.js'
+import { createMermaidRenderer } from './mermaid.js'
 import { readStyleBundle, resolveCssPaths } from './styleSources.js'
 import type { CssMode } from './template.js'
 import { DEFAULT_CSL_STYLE, fetchCslStyle } from './csl.js'
@@ -47,7 +48,7 @@ Options:
   --title <title>       Override title from frontmatter
   --lang <lang>         HTML language attribute (default: en)
   --browser-executable <file>
-                        Chrome/Chromium executable for PDF output
+                        Chrome/Chromium executable for Mermaid and PDF output
   --watch               Rebuild on file changes
   --copy-assets         Compatibility option; images/posters compile inline
   --help                Show this help
@@ -259,14 +260,37 @@ async function buildOnce(options: CliOptions): Promise<void> {
   }
 
   const css: CssMode = { mode: 'embed', content: styleBundle.content }
+  const mermaidRenderer = createMermaidRenderer(
+    {
+      browserExecutablePath: options.browserExecutable
+        ? path.resolve(options.browserExecutable)
+        : undefined
+    },
+    {
+      launch: async ({ executablePath }) => {
+        const { default: puppeteer } = await import('puppeteer')
+        return puppeteer.launch(executablePath ? { executablePath } : {})
+      }
+    }
+  )
 
-  const result = await convert(markdown, {
-    css,
-    unsafeHtml: options.unsafeHtml,
-    title: options.title,
-    lang: options.lang,
-    citations
-  })
+  const result = await (async () => {
+    try {
+      return await convert(markdown, {
+        css,
+        unsafeHtml: options.unsafeHtml,
+        title: options.title,
+        lang: options.lang,
+        citations,
+        mermaid: {
+          renderer: mermaidRenderer.render,
+          failureMode: 'error'
+        }
+      })
+    } finally {
+      await mermaidRenderer.dispose()
+    }
+  })()
 
   const outputDir = path.dirname(path.resolve(options.output))
   const compiledHtmlPath = path.resolve(compiledHtmlPathForOutput(options.output))

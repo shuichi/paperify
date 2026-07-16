@@ -15,6 +15,7 @@ import {
   detectBrowserExecutable,
   exportPdfToFile
 } from '../src/pdf'
+import type { MermaidRenderer } from 'paperify/api'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const fixturesDir = path.join(here, 'fixtures')
@@ -183,6 +184,40 @@ describe('exportPdfToFile', () => {
     ).rejects.toThrow(/no bibliography/)
 
     expect(run.launchOptions).toHaveLength(0)
+  })
+
+  it('places a statically rendered Mermaid figure in the HTML sent to PDF', async () => {
+    const run = fakeLauncher()
+    const mermaidRenderer: MermaidRenderer = async () => [
+      {
+        ok: true,
+        value: {
+          svg: '<svg xmlns="http://www.w3.org/2000/svg"><desc>PDF diagram</desc></svg>',
+          description: 'PDF diagram'
+        }
+      }
+    ]
+
+    await exportPdfToFile({
+      markdown: DOC.replace(
+        'Body text.',
+        '```mermaid\ngraph TD\nA-->B\n```'
+      ),
+      inputDir: fixturesDir,
+      outputPath: path.join(makeOutputDir(), 'mermaid.pdf'),
+      css: '',
+      browserExecutablePath: process.execPath,
+      launch: run.launcher,
+      mermaidRenderer
+    })
+
+    expect(run.htmlSeenByBrowser[0]).toContain(
+      'class="image-figure mermaid-figure"'
+    )
+    expect(run.htmlSeenByBrowser[0]).toContain(
+      'src="data:image/svg+xml;base64,'
+    )
+    expect(run.htmlSeenByBrowser[0]).not.toContain('<script')
   })
 })
 

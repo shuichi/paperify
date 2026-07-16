@@ -2,7 +2,7 @@
   "name": "paperify-preview",
   "displayName": "Paperify Preview",
   "description": "Preview Paperify Markdown documents (paperify: true) as compiled paper-style HTML inside VS Code, and export them to PDF.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "paperify",
   "license": "GPL-3.0-only",
   "private": true,
@@ -78,7 +78,7 @@
         "paperify.pdf.browserExecutable": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path to a Chrome, Edge, or Chromium executable used for PDF export. Leave empty to auto-detect a locally installed browser."
+          "markdownDescription": "Path to a Chrome, Edge, or Chromium executable used for Mermaid rendering and PDF export. Leave empty to auto-detect a locally installed browser."
         }
       }
     }

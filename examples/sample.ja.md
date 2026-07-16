@@ -72,6 +72,17 @@ $\mathcal{L} = -\frac{1}{n}\sum_i \log p(x_i \mid x_{<i})$ である。
 
 ::figure{src="media/system.svg" alt="システム図" caption="図2: システム概要。印刷時にはこの図がページ幅いっぱいにまたがる。" wide=true}
 
+同じビルドパイプラインを Mermaid 図として直接記述することもできる。
+単一 HTML を書き出す前に、静的 SVG へ変換される。
+
+```mermaid
+flowchart TD
+  Markdown --> Paperify
+  Paperify --> HTML
+  HTML --> Screen
+  HTML --> PDF
+```
+
 ### デモ動画
 
 動画はディレクティブで埋め込む。画面では再生可能な動画として表示し、

@@ -11,7 +11,7 @@
  *   (here)         resolves the bibliography exactly like the CLI
  *                  (frontmatter path, terminal bibtex block, <input>.bib)
  *   convert()      Paperify Markdown → standalone HTML (CSS embedded,
- *                  KaTeX rendered statically, citeproc citations,
+ *                  KaTeX and Mermaid rendered statically, citeproc citations,
  *                  raw HTML disabled)
  *   compileHtml()  inlines local images, video posters, KaTeX CSS + fonts
  */
@@ -30,6 +30,7 @@ import {
   resolveBibliographySource,
   textContainsCitation,
   type CitationOptions,
+  type MermaidRenderer,
   type PaperMeta
 } from 'paperify/api'
 
@@ -48,6 +49,10 @@ export interface BuildRequest {
    * to warnings so live preview typing never breaks the panel.
    */
   strictCitations?: boolean
+  /** Fail on Mermaid errors for export; preview keeps the source + warning. */
+  strictMermaid?: boolean
+  /** Shared lazy browser renderer supplied by extension activation. */
+  mermaidRenderer?: MermaidRenderer
   /** Test seam; defaults to the CLI's cached Zotero style download. */
   fetchCslXml?: (styleId: string) => Promise<string>
 }
@@ -132,7 +137,17 @@ export async function buildCompiledHtml(request: BuildRequest): Promise<BuildRes
   const converted = await convert(extracted.markdown, {
     css: { mode: 'embed', content: request.css },
     unsafeHtml: false,
-    citations
+    citations,
+    ...(request.mermaidRenderer
+      ? {
+          mermaid: {
+            renderer: request.mermaidRenderer,
+            failureMode: request.strictMermaid
+              ? ('error' as const)
+              : ('warn' as const)
+          }
+        }
+      : {})
   })
 
   const compiled = compileHtml({

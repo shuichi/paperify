@@ -117,7 +117,13 @@ describe('PdfExportController', () => {
     const { requests, exporter } = recordingExporter({
       warnings: ['image asset not found, left as-is: media/nope.png']
     })
-    const controller = new PdfExportController(output as never, () => 'CSS-X', exporter)
+    const mermaidRenderer = async () => []
+    const controller = new PdfExportController(
+      output as never,
+      () => 'CSS-X',
+      exporter,
+      mermaidRenderer
+    )
     __mock.saveDialogResult = Uri.file('/out/paper.pdf')
     __mock.configuration.set('paperify.pdf.browserExecutable', '/opt/chrome')
     __mock.infoMessageChoice = 'Open PDF'
@@ -135,6 +141,7 @@ describe('PdfExportController', () => {
       css: 'CSS-X',
       browserExecutablePath: '/opt/chrome'
     })
+    expect(requests[0].mermaidRenderer).toBe(mermaidRenderer)
     expect(__mock.progressCalls).toHaveLength(1)
     expect(__mock.messages.some((m) => m.includes('exported paper.pdf'))).toBe(true)
     expect(output.lines.some((line) => line.includes('[warning]'))).toBe(true)

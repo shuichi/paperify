@@ -8,6 +8,7 @@ import {
   renderPreviewHtml,
   type PreviewRenderResult
 } from '../src/render'
+import type { MermaidRenderer } from 'paperify/api'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const fixturesDir = path.join(here, 'fixtures')
@@ -27,6 +28,7 @@ const stubFetchCslXml = () => Promise.resolve(cslStyles.apa)
 interface RenderOverrides {
   documentPath?: string
   fetchCslXml?: (styleId: string) => Promise<string>
+  mermaidRenderer?: MermaidRenderer
 }
 
 function render(
@@ -90,6 +92,28 @@ describe('preview rendering', () => {
 
     expect(html).toContain('<table>')
     expect(html).toContain('hljs')
+    expect(html).not.toContain('<script')
+  })
+
+  it('keeps Mermaid diagrams static under the script-free CSP', async () => {
+    const mermaidRenderer: MermaidRenderer = async () => [
+      {
+        ok: true,
+        value: {
+          svg: '<svg xmlns="http://www.w3.org/2000/svg"><desc>Preview diagram</desc></svg>',
+          description: 'Preview diagram'
+        }
+      }
+    ]
+    const { html, warnings } = await render(
+      doc('```mermaid\ngraph TD\nA-->B\n```'),
+      { mermaidRenderer }
+    )
+
+    expect(warnings).toEqual([])
+    expect(html).toContain('class="image-figure mermaid-figure"')
+    expect(html).toContain('src="data:image/svg+xml;base64,')
+    expect(html).toContain("script-src 'none'")
     expect(html).not.toContain('<script')
   })
 

@@ -26,6 +26,7 @@ import {
   renderPdf,
   type PdfBrowserLauncher
 } from 'paperify/pdf'
+import type { MermaidRenderer } from 'paperify/api'
 
 import { buildCompiledHtml } from './build'
 
@@ -123,13 +124,17 @@ export interface ExportPdfRequest {
   launch?: PdfBrowserLauncher
   /** Test seam; defaults to the CLI's cached Zotero style download. */
   fetchCslXml?: (styleId: string) => Promise<string>
+  /** Build-time Mermaid renderer shared by preview and PDF export. */
+  mermaidRenderer?: MermaidRenderer
 }
 
 export interface ExportPdfResult {
   warnings: string[]
 }
 
-function resolveExecutablePath(configured: string | undefined): string | undefined {
+export function resolveBrowserExecutablePath(
+  configured: string | undefined
+): string | undefined {
   const trimmed = configured?.trim()
   if (trimmed) {
     if (!fs.existsSync(trimmed)) {
@@ -158,7 +163,9 @@ async function moveFile(from: string, to: string): Promise<void> {
 export async function exportPdfToFile(
   request: ExportPdfRequest
 ): Promise<ExportPdfResult> {
-  const executablePath = resolveExecutablePath(request.browserExecutablePath)
+  const executablePath = resolveBrowserExecutablePath(
+    request.browserExecutablePath
+  )
 
   const built = await buildCompiledHtml({
     markdown: request.markdown,
@@ -166,6 +173,8 @@ export async function exportPdfToFile(
     documentPath: request.documentPath,
     css: request.css,
     strictCitations: true,
+    strictMermaid: true,
+    mermaidRenderer: request.mermaidRenderer,
     fetchCslXml: request.fetchCslXml
   })
 

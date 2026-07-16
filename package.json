@@ -10,6 +10,7 @@
     "paper",
     "print",
     "katex",
+    "mermaid",
     "publishing"
   ],
   "license": "GPL-3.0-only",
@@ -31,6 +32,10 @@
     "./pdf": {
       "types": "./dist/pdf.d.ts",
       "default": "./dist/pdf.js"
+    },
+    "./mermaid": {
+      "types": "./dist/mermaid.d.ts",
+      "default": "./dist/mermaid.js"
     },
     "./styles/paperify.css": "./styles/paperify.css",
     "./package.json": "./package.json"
@@ -56,6 +61,7 @@
     "gray-matter": "^4.0.3",
     "katex": "^0.17.0",
     "mdast-util-directive": "^3.1.0",
+    "mermaid": "^11.16.0",
     "puppeteer": "^25.3.0",
     "rehype-highlight": "^7.0.2",
     "rehype-katex": "^7.0.1",

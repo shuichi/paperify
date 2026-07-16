@@ -11,6 +11,7 @@ import path from 'node:path'
 import * as vscode from 'vscode'
 
 import { BrowserLaunchError } from 'paperify/pdf'
+import type { MermaidRenderer } from 'paperify/api'
 
 import { isPaperifyDocument } from './detect'
 import { documentDir, documentPath, fallbackInputDir } from './documentPaths'
@@ -49,7 +50,8 @@ export class PdfExportController implements vscode.Disposable {
   constructor(
     private readonly output: vscode.OutputChannel,
     private readonly loadCss: () => string,
-    private readonly exporter: PdfExporter = exportPdfToFile
+    private readonly exporter: PdfExporter = exportPdfToFile,
+    private readonly mermaidRenderer?: MermaidRenderer
   ) {}
 
   dispose(): void {
@@ -98,7 +100,8 @@ export class PdfExportController implements vscode.Disposable {
             css: this.loadCss(),
             browserExecutablePath: vscode.workspace
               .getConfiguration('paperify')
-              .get<string>('pdf.browserExecutable')
+              .get<string>('pdf.browserExecutable'),
+            mermaidRenderer: this.mermaidRenderer
           })
       )
       this.logWarnings(key, result.warnings)

@@ -456,6 +456,11 @@ hr {
   margin: 0 auto;
 }
 
+/* Mermaid SVGs are isolated in image data URIs; fill the available column. */
+.paper-content .mermaid-figure img {
+  width: 100%;
+}
+
 .paper-content figcaption {
   margin-top: 0.6em;
   font-size: 0.85rem;

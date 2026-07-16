@@ -42,6 +42,8 @@ matches CLI output as closely as a webview allows:
 
 - Paperify's stylesheet is embedded.
 - Math is rendered statically with KaTeX (CSS and fonts inlined, no CDN).
+- Mermaid fences are rendered to static SVG image figures at build time; no
+  scripts or CDN requests are added to the preview.
 - Local images and video posters are inlined as data URIs by `compileHtml()`.
 - Local video files are served through webview resource URIs.
 - GFM tables/footnotes, figures, video directives, and static code
@@ -75,17 +77,20 @@ to a print-ready PDF, exactly like the CLI's `paperify input.md -o output.pdf`:
 - Citation problems fail the export with an error (like the CLI), rather than
   degrading to a warning like the live preview — an exported paper should
   never silently drop its citations.
+- Invalid Mermaid diagrams likewise fail PDF export, while the live preview
+  keeps the source code block and reports a warning during editing.
 - A save dialog picks the destination (defaulting to `<input>.pdf` next to
   the document), a progress notification shows while printing, and duplicate
   exports of the same document are blocked.
 
-PDF rendering needs a locally installed **Chrome, Edge, or Chromium**. The
+PDF rendering and previews containing Mermaid need a locally installed
+**Chrome, Edge, or Chromium**. The
 extension ships no browser (and no full Puppeteer): it drives your local
 browser through `puppeteer-core`. The executable is auto-detected from
 standard install locations; if yours lives elsewhere, set:
 
 - `paperify.pdf.browserExecutable` — absolute path to the browser executable
-  used for PDF export.
+  used for Mermaid rendering and PDF export.
 
 ## Security
 
@@ -112,7 +117,7 @@ npm install
 npm run build          # builds dist/, which the extension imports as paperify/api
 cd vscode-paperify
 npm install
-npm run build          # bundles dist/extension.js and copies assets/paperify.css
+npm run build          # bundles extension.js and copies Paperify CSS + Mermaid
 npm run typecheck
 npm test
 ```
@@ -125,12 +130,13 @@ npm run package
 code --install-extension paperify-preview-*.vsix
 ```
 
-The bundle contains no browser binary and no full Puppeteer. PDF rendering
-uses `puppeteer-core` (compiled into the bundle) against your locally
-installed Chrome/Edge/Chromium. The packaged runtime dependencies are `katex`
-(stylesheet and fonts) and the citation stack (`citation-js`, `citeproc`,
-CSL plugins), which is loaded lazily and only for documents that actually
-have a bibliography.
+The bundle contains no browser binary and no full Puppeteer. Mermaid and PDF
+rendering use `puppeteer-core` (compiled into the bundle) against your locally
+installed Chrome/Edge/Chromium. The standalone Mermaid browser bundle is
+copied into the VSIX as a local asset. The packaged runtime dependencies also
+include `katex` (stylesheet and fonts) and the citation stack (`citation-js`,
+`citeproc`, CSL plugins), which is loaded lazily and only for documents that
+actually have a bibliography.
 
 Requires VS Code 1.101 or later (its extension host provides the Node.js 22
 runtime that `puppeteer-core` needs).

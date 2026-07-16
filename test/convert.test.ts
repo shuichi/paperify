@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url'
 import { convert } from '../src/convert.js'
 import { parseFrontmatter } from '../src/frontmatter.js'
 import { inferVideoType } from '../src/transforms/videoDirective.js'
+import type { MermaidRenderer } from '../src/mermaid.js'
+import { BrowserLaunchError } from '../src/pdf.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
@@ -158,6 +160,115 @@ describe('basic Markdown conversion', () => {
     const plain = await convert('```\nconst answer = 42\n```\n')
     expect(plain.contentHtml).toContain('<pre><code>const answer = 42')
     expect(plain.contentHtml).not.toContain('hljs')
+  })
+})
+
+describe('Mermaid diagrams', () => {
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 40">' +
+    '<title>System flow</title><desc>Request flows from A to B</desc>' +
+    '<path d="M0 20h100"/></svg>'
+
+  it('renders a Mermaid fence as a static semantic image figure', async () => {
+    const renderer: MermaidRenderer = async (definitions) => {
+      expect(definitions).toEqual(['graph TD\n  A-->B'])
+      return [
+        {
+          ok: true,
+          value: {
+            svg,
+            title: 'System flow',
+            description: 'Request flows from A to B'
+          }
+        }
+      ]
+    }
+
+    const { contentHtml, html, assets, warnings } = await convert(
+      '```mermaid\ngraph TD\n  A-->B\n```\n',
+      { mermaid: { renderer } }
+    )
+
+    expect(warnings).toEqual([])
+    expect(contentHtml).toContain(
+      '<figure class="image-figure mermaid-figure">'
+    )
+    expect(contentHtml).toContain('src="data:image/svg+xml;base64,')
+    expect(contentHtml).toContain('alt="Request flows from A to B"')
+    expect(contentHtml).toContain('title="System flow"')
+    expect(contentHtml).not.toContain('language-mermaid')
+    expect(contentHtml).not.toContain('graph TD')
+    expect(html).not.toContain('<script')
+    expect(assets).toEqual([])
+  })
+
+  it('batches multiple Mermaid fences in source order', async () => {
+    const calls: string[][] = []
+    const renderer: MermaidRenderer = async (definitions) => {
+      calls.push([...definitions])
+      return definitions.map((definition) => ({
+        ok: true,
+        value: { svg: svg.replace('System flow', definition) }
+      }))
+    }
+
+    const result = await convert(
+      '```mermaid\ngraph LR\nA-->B\n```\n\n```mermaid\nsequenceDiagram\nA->>B: Hi\n```\n',
+      { mermaid: { renderer } }
+    )
+
+    expect(calls).toEqual([
+      ['graph LR\nA-->B', 'sequenceDiagram\nA->>B: Hi']
+    ])
+    expect(result.contentHtml.match(/class="image-figure mermaid-figure"/g)).toHaveLength(2)
+  })
+
+  it('keeps source code and warns when no renderer is provided', async () => {
+    const { contentHtml, warnings } = await convert(
+      '```mermaid\ngraph TD\nA-->B\n```\n'
+    )
+
+    expect(contentHtml).toContain('class="hljs language-mermaid"')
+    expect(contentHtml).toContain('graph TD')
+    expect(warnings.join(' ')).toContain('no Mermaid renderer')
+  })
+
+  it('keeps source code in warn mode when Mermaid syntax is invalid', async () => {
+    const renderer: MermaidRenderer = async () => [
+      { ok: false, error: 'Parse error on line 1' }
+    ]
+    const { contentHtml, warnings } = await convert(
+      '```mermaid\nnot a diagram\n```\n',
+      { mermaid: { renderer, failureMode: 'warn' } }
+    )
+
+    expect(contentHtml).toContain('not a diagram')
+    expect(warnings.join(' ')).toContain('Parse error on line 1')
+  })
+
+  it('fails strict builds when Mermaid syntax is invalid', async () => {
+    const renderer: MermaidRenderer = async () => [
+      { ok: false, error: 'Parse error on line 1' }
+    ]
+
+    await expect(
+      convert('```mermaid\nnot a diagram\n```\n', {
+        mermaid: { renderer, failureMode: 'error' }
+      })
+    ).rejects.toThrow(/Parse error on line 1/)
+  })
+
+  it('preserves browser launch errors for host-specific recovery', async () => {
+    const launchError = new BrowserLaunchError('Could not find Chrome')
+    const renderer: MermaidRenderer = async () => {
+      throw launchError
+    }
+
+    await expect(
+      convert('```mermaid\ngraph TD\nA-->B\n```\n', {
+        mermaid: { renderer, failureMode: 'error' }
+      })
+    ).rejects.toBe(launchError)
   })
 })
 

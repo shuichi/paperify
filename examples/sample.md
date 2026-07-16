@@ -68,6 +68,17 @@ Wide figures use a directive and span both columns in print:
 
 ::figure{src="media/system.svg" alt="System diagram" caption="Figure 2: System overview. In print this figure spans the full page width." wide=true}
 
+The same build pipeline can be expressed directly as a Mermaid diagram. It
+is converted to a static SVG before the standalone HTML is written:
+
+```mermaid
+flowchart TD
+  Markdown --> Paperify
+  Paperify --> HTML
+  HTML --> Screen
+  HTML --> PDF
+```
+
 ### Demonstration video
 
 Videos are embedded with a directive. On screen the video is playable;

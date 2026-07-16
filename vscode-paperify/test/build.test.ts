@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { buildCompiledHtml, type BuildRequest } from '../src/build'
+import type { MermaidRenderer } from 'paperify/api'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const fixturesDir = path.join(here, 'fixtures')
@@ -31,6 +32,15 @@ function build(markdown: string, overrides: Partial<BuildRequest> = {}) {
 
 const doc = (body: string): string =>
   ['---', 'paperify: true', 'title: Build Test', '---', '', body, ''].join('\n')
+
+const staticMermaidRenderer: MermaidRenderer = async (definitions) =>
+  definitions.map(() => ({
+    ok: true,
+    value: {
+      svg: '<svg xmlns="http://www.w3.org/2000/svg"><desc>Build diagram</desc></svg>',
+      description: 'Build diagram'
+    }
+  }))
 
 const CITED_BODY = 'As shown in [@knuth1984texbook], typesetting matters.'
 const BIBTEX_BLOCK = [
@@ -81,6 +91,32 @@ describe('buildCompiledHtml', () => {
     expect(meta.footerTemplate).toBe('<div>footer</div>')
   })
 
+  it('embeds Mermaid as a static SVG image without runtime scripts', async () => {
+    const { html, warnings } = await build(
+      doc('```mermaid\ngraph TD\nA-->B\n```'),
+      { mermaidRenderer: staticMermaidRenderer }
+    )
+
+    expect(warnings).toEqual([])
+    expect(html).toContain('class="image-figure mermaid-figure"')
+    expect(html).toContain('src="data:image/svg+xml;base64,')
+    expect(html).toContain('alt="Build diagram"')
+    expect(html).not.toContain('<script')
+  })
+
+  it('keeps invalid Mermaid source as a preview warning', async () => {
+    const renderer: MermaidRenderer = async () => [
+      { ok: false, error: 'diagram is incomplete' }
+    ]
+    const { html, warnings } = await build(
+      doc('```mermaid\ngraph TD\n```'),
+      { mermaidRenderer: renderer }
+    )
+
+    expect(html).toContain('class="hljs language-mermaid"')
+    expect(warnings.join(' ')).toContain('diagram is incomplete')
+  })
+
   it('processes a terminal bibtex block through citeproc like the CLI', async () => {
     const { html, warnings } = await build(doc(`${CITED_BODY}\n\n${BIBTEX_BLOCK}`))
 
@@ -117,6 +153,19 @@ describe('buildCompiledHtml', () => {
   })
 
   describe('strict mode (PDF export)', () => {
+    it('fails when a Mermaid diagram is invalid', async () => {
+      const renderer: MermaidRenderer = async () => [
+        { ok: false, error: 'diagram is incomplete' }
+      ]
+
+      await expect(
+        build(doc('```mermaid\ngraph TD\n```'), {
+          strictMermaid: true,
+          mermaidRenderer: renderer
+        })
+      ).rejects.toThrow(/diagram is incomplete/)
+    })
+
     it('fails when citations have no bibliography', async () => {
       await expect(
         build(doc(CITED_BODY), { strictCitations: true })

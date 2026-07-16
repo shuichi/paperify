@@ -54,19 +54,19 @@ paperify <input.md> [options]
 --lang <lang>         Override the HTML language attribute
                       (default: frontmatter lang, then en)
 --browser-executable <file>
-                      Chrome/Chromium executable for PDF output
+                      Chrome/Chromium executable for Mermaid and PDF output
 --watch               Rebuild on file changes
 --copy-assets         Compatibility option; images/posters compile inline
 --help                Show help
 ```
 
-Paperify compiles Markdown to a self-contained HTML file. The compiled HTML embeds Paperify CSS, local images, video posters/fallbacks, KaTeX CSS, and KaTeX fonts as data URIs, so the HTML can be opened on its own. Video files themselves are not embedded; use `--copy-assets` if you want local video sources copied next to the output for playback.
+Paperify compiles Markdown to a self-contained HTML file. The compiled HTML embeds Paperify CSS, local images, Mermaid SVGs, video posters/fallbacks, KaTeX CSS, and KaTeX fonts as data URIs, so the HTML can be opened on its own. Video files themselves are not embedded; use `--copy-assets` if you want local video sources copied next to the output for playback.
 
 When the output path ends in `.pdf`, Paperify first writes the compiled HTML beside the PDF, then opens that HTML with Puppeteer's Chromium engine and prints it to PDF. For example, `paperify paper.md -o dist/paper.pdf` writes both `dist/paper.html` and `dist/paper.pdf`.
 
 ## Example documents
 
-The repository includes English and Japanese sample papers that exercise the same features: frontmatter, math, citations, figures, tables, code, footnotes, and video.
+The repository includes English and Japanese sample papers that exercise the same features: frontmatter, math, citations, figures, Mermaid diagrams, tables, code, footnotes, and video.
 
 - `examples/sample.md` is the English sample used by `npm run example`.
 - `examples/sample.ja.md` is the Japanese sample. Its frontmatter sets `lang: ja`, so the generated HTML uses `<html lang="ja">` and the bundled CSS switches to Japanese font variables with `:root:lang(ja)`.
@@ -214,6 +214,23 @@ For explicit control — including **wide figures** that span both print columns
 ::figure{src="images/system.png" alt="System diagram" caption="System overview" wide=true}
 ```
 
+### Mermaid diagrams
+
+Fenced code blocks tagged `mermaid` are rendered to SVG at build time:
+
+````markdown
+```mermaid
+flowchart LR
+  Markdown --> Paperify
+  Paperify --> HTML
+  HTML --> PDF
+```
+````
+
+The SVG is embedded as an image data URI inside a semantic figure. The final HTML contains neither Mermaid source nor runtime JavaScript and does not contact a CDN. Mermaid's `accDescr` becomes the image `alt` text, while `accTitle` becomes its `title`; without either, Paperify uses `Mermaid diagram` as the accessible fallback.
+
+Mermaid rendering uses Chromium only at build time. Invalid diagrams fail CLI and PDF builds with the Mermaid parser error. The VS Code live preview instead keeps the source code block and reports a warning while the diagram is being edited.
+
 ### Video
 
 ```markdown
@@ -243,6 +260,7 @@ Raw HTML is **disabled by default** — unknown HTML in the source is dropped. W
 | Layout         | single centered column (~78ch) | two-column A4, front matter single-column |
 | Body size      | 16px, line-height 1.7          | 9.5pt, line-height 1.45                   |
 | Wide elements  | normal width                   | `column-span: all`                        |
+| Mermaid        | static SVG                     | static SVG kept inside its column         |
 | Video          | playable                       | poster / placeholder + source URL         |
 | Long equations | horizontal scroll              | constrained to column                     |
 | Links          | accent-colored underline       | plain text (optional URL display)         |
@@ -320,6 +338,7 @@ src/
   cli.ts                     CLI: args, watch, compile/PDF orchestration
   compile.ts                 self-contained compiled HTML generation
   convert.ts                 unified pipeline (remark → rehype)
+  mermaid.ts                 injected Chromium renderer for static SVG
   pdf.ts                     Puppeteer PDF rendering
   template.ts                standalone HTML document assembly
   frontmatter.ts             YAML metadata parsing & normalization
@@ -327,6 +346,7 @@ src/
   transforms/
     figures.ts               image-only paragraph → <figure>
     figureDirective.ts       ::figure{...}
+    mermaid.ts               mermaid fence → static SVG figure
     videoDirective.ts        ::video{...} + print fallback markup
     sanitizeSchema.ts        allowlist for --unsafe-html
 styles/
@@ -337,6 +357,7 @@ examples/
   sample.bib                 shared bibliography for the samples
 test/
   convert.test.ts            Vitest suite
+  mermaid.test.ts            renderer lifecycle and caching
 ```
 
 ## License

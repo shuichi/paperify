@@ -41,3 +41,10 @@ export {
 } from './csl.js'
 export { textContainsCitation } from './citationSyntax.js'
 export type { CitationOptions } from './citations.js'
+export type {
+  MermaidConversionOptions,
+  MermaidFailureMode,
+  MermaidRenderer,
+  MermaidRenderOutcome,
+  MermaidRenderValue
+} from './mermaid.js'

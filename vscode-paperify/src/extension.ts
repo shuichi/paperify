@@ -9,11 +9,17 @@
 import path from 'node:path'
 import * as vscode from 'vscode'
 
-import { readStyleBundle } from 'paperify/api'
+import { readStyleBundle, type MermaidRenderer } from 'paperify/api'
+import { createMermaidRenderer } from 'paperify/mermaid'
 import { isPaperifyDocument } from './detect'
 import { PdfExportController } from './exportController'
 import { PreviewManager } from './preview'
 import { renderPreviewHtml, type PreviewRenderer } from './render'
+import {
+  MISSING_BROWSER_HELP,
+  exportPdfToFile,
+  resolveBrowserExecutablePath
+} from './pdf'
 
 const CONTEXT_KEY = 'paperify.isPaperifyDocument'
 const CONTEXT_DEBOUNCE_MS = 200
@@ -26,15 +32,51 @@ function createCssLoader(context: vscode.ExtensionContext): () => string {
     }).content)
 }
 
-function createRenderer(loadCss: () => string): PreviewRenderer {
-  return (request) => renderPreviewHtml({ ...request, css: loadCss() })
+function createRenderer(
+  loadCss: () => string,
+  mermaidRenderer: MermaidRenderer
+): PreviewRenderer {
+  return (request) =>
+    renderPreviewHtml({
+      ...request,
+      css: loadCss(),
+      mermaidRenderer
+    })
 }
 
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel('Paperify')
   const loadCss = createCssLoader(context)
-  const manager = new PreviewManager(output, createRenderer(loadCss))
-  const pdfExport = new PdfExportController(output, loadCss)
+  const mermaid = createMermaidRenderer(
+    {
+      scriptPath: context.asAbsolutePath(
+        path.join('assets', 'mermaid.min.js')
+      )
+    },
+    {
+      missingBrowserHelp: MISSING_BROWSER_HELP,
+      launch: async () => {
+        const configured = vscode.workspace
+          .getConfiguration('paperify')
+          .get<string>('pdf.browserExecutable')
+        const executablePath = resolveBrowserExecutablePath(configured)
+        const { default: puppeteer } = await import('puppeteer-core')
+        return puppeteer.launch(
+          executablePath ? { executablePath } : { channel: 'chrome' }
+        )
+      }
+    }
+  )
+  const manager = new PreviewManager(
+    output,
+    createRenderer(loadCss, mermaid.render)
+  )
+  const pdfExport = new PdfExportController(
+    output,
+    loadCss,
+    exportPdfToFile,
+    mermaid.render
+  )
 
   let contextTimer: ReturnType<typeof setTimeout> | undefined
   let lastContextValue: boolean | undefined
@@ -73,6 +115,7 @@ export function activate(context: vscode.ExtensionContext): void {
     output,
     manager,
     pdfExport,
+    { dispose: () => void mermaid.dispose() },
     vscode.commands.registerCommand('paperify.openPreview', () =>
       openFromActiveEditor(vscode.ViewColumn.Active)
     ),
@@ -99,6 +142,11 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidChangeTextDocument((event) => {
       if (event.document === vscode.window.activeTextEditor?.document) {
         scheduleContextKeyUpdate()
+      }
+    }),
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration('paperify.pdf.browserExecutable')) {
+        void mermaid.dispose()
       }
     }),
     {

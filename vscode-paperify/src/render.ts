@@ -17,7 +17,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { isLocalAsset } from 'paperify/api'
+import { isLocalAsset, type MermaidRenderer } from 'paperify/api'
 
 import { buildCompiledHtml } from './build'
 
@@ -154,6 +154,8 @@ export async function renderPreviewHtml(
     css: string
     /** Test seam; defaults to the CLI's cached Zotero style download. */
     fetchCslXml?: (styleId: string) => Promise<string>
+    /** Build-time Mermaid renderer shared by the extension. */
+    mermaidRenderer?: MermaidRenderer
   }
 ): Promise<PreviewRenderResult> {
   const built = await buildCompiledHtml({
@@ -161,7 +163,8 @@ export async function renderPreviewHtml(
     inputDir: request.inputDir,
     documentPath: request.documentPath,
     css: `${WEBVIEW_RESET_CSS}\n\n${request.css}`,
-    fetchCslXml: request.fetchCslXml
+    fetchCslXml: request.fetchCslXml,
+    mermaidRenderer: request.mermaidRenderer
   })
 
   const mediaWarnings: string[] = []

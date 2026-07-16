@@ -8,7 +8,7 @@
  *   remark-gfm         tables, footnotes, strikethrough, autolinks
  *   remark-math        $inline$ and $$display$$ math
  *   remark-directive   ::figure / ::video directives
- *   (paperify)         figure & video transforms
+ *   (paperify)         figure, video & static Mermaid transforms
  *   remark-rehype      mdast → hast
  *   rehype-raw         only with --unsafe-html
  *   rehype-sanitize    only with --unsafe-html (allowlist schema)
@@ -40,8 +40,10 @@ import { collectAssets } from './assets.js'
 import remarkImageFigures from './transforms/figures.js'
 import remarkFigureDirective from './transforms/figureDirective.js'
 import remarkVideoDirective from './transforms/videoDirective.js'
+import remarkMermaid from './transforms/mermaid.js'
 import sanitizeSchema from './transforms/sanitizeSchema.js'
 import type { CitationOptions, CitationState } from './citations.js'
+import type { MermaidConversionOptions } from './mermaid.js'
 
 /**
  * The citation stack (citation-js, citeproc, CSL data) is heavy and only
@@ -66,6 +68,8 @@ export interface ConvertOptions {
   lang?: string
   /** BibTeX/CSL inputs used to resolve Markdown citations like [@key]. */
   citations?: CitationOptions
+  /** Build-time renderer for fenced `mermaid` diagrams. */
+  mermaid?: MermaidConversionOptions
 }
 
 export interface ConvertResult {
@@ -94,6 +98,7 @@ function buildProcessor(
     .use(remarkFigureDirective)
     .use(remarkVideoDirective)
     .use(remarkImageFigures)
+    .use(remarkMermaid, options.mermaid)
 
   if (citations) {
     processor = processor.use(citations.module.remarkCitations(citations.state))
@@ -172,3 +177,10 @@ export async function convert(
 
 export type { PaperMeta, Author } from './frontmatter.js'
 export type { CssMode } from './template.js'
+export type {
+  MermaidConversionOptions,
+  MermaidFailureMode,
+  MermaidRenderer,
+  MermaidRenderOutcome,
+  MermaidRenderValue
+} from './mermaid.js'
