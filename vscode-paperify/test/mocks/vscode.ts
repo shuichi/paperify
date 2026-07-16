@@ -131,6 +131,8 @@ export const __mock = {
   configuration: new Map<string, unknown>(),
   saveDialogCalls: [] as unknown[],
   saveDialogResult: undefined as Uri | undefined,
+  quickPickCalls: [] as Array<{ items: unknown[]; options: unknown }>,
+  quickPickResult: undefined as unknown,
   progressCalls: [] as unknown[],
   infoMessageChoice: undefined as string | undefined,
   errorMessageChoice: undefined as string | undefined,
@@ -152,6 +154,8 @@ export const __mock = {
     this.configuration.clear()
     this.saveDialogCalls = []
     this.saveDialogResult = undefined
+    this.quickPickCalls = []
+    this.quickPickResult = undefined
     this.progressCalls = []
     this.infoMessageChoice = undefined
     this.errorMessageChoice = undefined
@@ -184,6 +188,10 @@ export const window = {
   showSaveDialog(options: unknown): Promise<Uri | undefined> {
     __mock.saveDialogCalls.push(options)
     return Promise.resolve(__mock.saveDialogResult)
+  },
+  showQuickPick<T>(items: readonly T[], options: unknown): Promise<T | undefined> {
+    __mock.quickPickCalls.push({ items: [...items], options })
+    return Promise.resolve(__mock.quickPickResult as T | undefined)
   },
   withProgress<T>(options: unknown, task: () => Promise<T>): Promise<T> {
     __mock.progressCalls.push(options)

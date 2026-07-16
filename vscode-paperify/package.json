@@ -1,8 +1,8 @@
 {
   "name": "paperify-preview",
   "displayName": "Paperify Preview",
-  "description": "Preview Paperify Markdown documents (paperify: true) as compiled paper-style HTML inside VS Code, and export them to PDF.",
-  "version": "0.2.1",
+  "description": "Preview Paperify Markdown documents (paperify: true) inside VS Code, and export them to standalone HTML or PDF.",
+  "version": "0.3.0",
   "publisher": "paperify",
   "license": "GPL-3.0-only",
   "private": true,
@@ -29,6 +29,14 @@
   "contributes": {
     "commands": [
       {
+        "command": "paperify.showActions",
+        "title": "Paperify: Show Actions",
+        "icon": {
+          "light": "media/paperify-action-light.svg",
+          "dark": "media/paperify-action-dark.svg"
+        }
+      },
+      {
         "command": "paperify.openPreview",
         "title": "Paperify: Open Preview",
         "icon": "$(open-preview)"
@@ -39,6 +47,11 @@
         "icon": "$(open-preview)"
       },
       {
+        "command": "paperify.exportHtml",
+        "title": "Paperify: Export HTML",
+        "icon": "$(code)"
+      },
+      {
         "command": "paperify.exportPdf",
         "title": "Paperify: Export PDF",
         "icon": "$(file-pdf)"
@@ -47,23 +60,26 @@
     "menus": {
       "editor/title": [
         {
-          "command": "paperify.openPreviewToSide",
-          "when": "editorLangId == markdown && paperify.isPaperifyDocument",
-          "group": "navigation"
-        },
-        {
-          "command": "paperify.exportPdf",
+          "command": "paperify.showActions",
           "when": "editorLangId == markdown && paperify.isPaperifyDocument",
           "group": "navigation"
         }
       ],
       "commandPalette": [
         {
+          "command": "paperify.showActions",
+          "when": "editorLangId == markdown && paperify.isPaperifyDocument"
+        },
+        {
           "command": "paperify.openPreview",
           "when": "editorLangId == markdown"
         },
         {
           "command": "paperify.openPreviewToSide",
+          "when": "editorLangId == markdown"
+        },
+        {
+          "command": "paperify.exportHtml",
           "when": "editorLangId == markdown"
         },
         {

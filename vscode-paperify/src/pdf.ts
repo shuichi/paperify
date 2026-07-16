@@ -31,7 +31,7 @@ import type { MermaidRenderer } from 'paperify/api'
 import { buildCompiledHtml } from './build'
 
 export const MISSING_BROWSER_HELP =
-  'PDF export needs a locally installed Chrome, Edge, or Chromium. Install ' +
+  'Mermaid rendering and PDF export need a locally installed Chrome, Edge, or Chromium. Install ' +
   'Google Chrome, or point the "paperify.pdf.browserExecutable" setting at ' +
   'a browser executable, and try again.'
 

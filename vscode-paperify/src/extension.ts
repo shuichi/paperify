@@ -1,9 +1,9 @@
 /**
  * extension.ts
  *
- * Activation glue: registers the preview and PDF export commands, maintains
- * the `paperify.isPaperifyDocument` context key that gates the editor-title
- * buttons, and wires the Paperify renderer to the preview manager.
+ * Activation glue: registers the action picker, preview, and export commands,
+ * maintains the `paperify.isPaperifyDocument` context key that gates the
+ * editor-title button, and wires the Paperify renderer to each feature.
  */
 
 import path from 'node:path'
@@ -11,8 +11,11 @@ import * as vscode from 'vscode'
 
 import { readStyleBundle, type MermaidRenderer } from 'paperify/api'
 import { createMermaidRenderer } from 'paperify/mermaid'
+import { showPaperifyActions } from './actionPicker'
 import { isPaperifyDocument } from './detect'
 import { PdfExportController } from './exportController'
+import { exportHtmlToFile } from './html'
+import { HtmlExportController } from './htmlExportController'
 import { PreviewManager } from './preview'
 import { renderPreviewHtml, type PreviewRenderer } from './render'
 import {
@@ -77,6 +80,12 @@ export function activate(context: vscode.ExtensionContext): void {
     exportPdfToFile,
     mermaid.render
   )
+  const htmlExport = new HtmlExportController(
+    output,
+    loadCss,
+    exportHtmlToFile,
+    mermaid.render
+  )
 
   let contextTimer: ReturnType<typeof setTimeout> | undefined
   let lastContextValue: boolean | undefined
@@ -115,13 +124,28 @@ export function activate(context: vscode.ExtensionContext): void {
     output,
     manager,
     pdfExport,
+    htmlExport,
     { dispose: () => void mermaid.dispose() },
+    vscode.commands.registerCommand(
+      'paperify.showActions',
+      showPaperifyActions
+    ),
     vscode.commands.registerCommand('paperify.openPreview', () =>
       openFromActiveEditor(vscode.ViewColumn.Active)
     ),
     vscode.commands.registerCommand('paperify.openPreviewToSide', () =>
       openFromActiveEditor(vscode.ViewColumn.Beside)
     ),
+    vscode.commands.registerCommand('paperify.exportHtml', () => {
+      const editor = vscode.window.activeTextEditor
+      if (!editor) {
+        void vscode.window.showInformationMessage(
+          'Open a Markdown document to export Paperify HTML.'
+        )
+        return
+      }
+      void htmlExport.exportDocument(editor.document)
+    }),
     vscode.commands.registerCommand('paperify.exportPdf', () => {
       const editor = vscode.window.activeTextEditor
       if (!editor) {

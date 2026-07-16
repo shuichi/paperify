@@ -1,8 +1,9 @@
 # Paperify Preview for VS Code
 
 Preview [Paperify](https://github.com/shuichi/paperify) Markdown documents as
-compiled paper-style HTML inside VS Code, and export them to print-ready PDF —
-without leaving your editor and without changing how you edit normal Markdown.
+compiled paper-style HTML inside VS Code, and export them to portable HTML or
+print-ready PDF — without leaving your editor and without changing how you
+edit normal Markdown.
 
 Only documents that explicitly opt in with the YAML boolean `paperify: true`
 are treated as Paperify documents:
@@ -27,13 +28,16 @@ does not replace the built-in Markdown preview.
 
 ## Commands
 
+- **Paperify: Show Actions** (`paperify.showActions`)
 - **Paperify: Open Preview** (`paperify.openPreview`)
 - **Paperify: Open Preview to the Side** (`paperify.openPreviewToSide`)
+- **Paperify: Export HTML** (`paperify.exportHtml`)
 - **Paperify: Export PDF** (`paperify.exportPdf`)
 
-Editor-title buttons (preview and PDF export) appear only when the active
-document is a Paperify document. Running a command on a non-Paperify document
-shows a short hint instead.
+A single simplified Paperify icon appears in the editor title only when the
+active document is a Paperify document. Selecting it opens a compact action
+picker containing preview, HTML export, and PDF export. Running an individual
+command on a non-Paperify document shows a short hint instead.
 
 ## What the preview shows
 
@@ -61,6 +65,22 @@ matches CLI output as closely as a webview allows:
 The preview updates live from unsaved editor content (debounced), and stale
 async renders can never overwrite newer ones.
 
+## HTML export
+
+**Paperify: Export HTML** converts the current editor content (saved or not)
+into portable, compiled HTML using the same pipeline as preview and PDF:
+
+- Paperify CSS, KaTeX CSS/fonts, local images, video posters, citations, and
+  Mermaid diagrams are embedded statically. Local video source files remain
+  external references, matching the CLI's compiled HTML behavior.
+- Webview-only reset styles, resource URIs, and CSP are not included, and the
+  result contains no runtime JavaScript.
+- Citation and Mermaid errors fail export rather than silently producing an
+  incomplete paper. Missing optional images and posters remain warnings in the
+  Paperify output channel.
+- A save dialog defaults to `<input>.html` next to the Markdown document. A
+  successful export can be opened directly from the completion notification.
+
 ## PDF export
 
 **Paperify: Export PDF** renders the current editor content (saved or not)
@@ -83,8 +103,8 @@ to a print-ready PDF, exactly like the CLI's `paperify input.md -o output.pdf`:
   the document), a progress notification shows while printing, and duplicate
   exports of the same document are blocked.
 
-PDF rendering and previews containing Mermaid need a locally installed
-**Chrome, Edge, or Chromium**. The
+PDF rendering and Mermaid diagrams in previews or HTML export need a locally
+installed **Chrome, Edge, or Chromium**. The
 extension ships no browser (and no full Puppeteer): it drives your local
 browser through `puppeteer-core`. The executable is auto-detected from
 standard install locations; if yours lives elsewhere, set:

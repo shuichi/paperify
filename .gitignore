@@ -1,3 +1,10 @@
+# LLM
+.claude
+
+# VS Code
+
+*.vsix
+
 # macOS Finder & Metadata
 .DS_Store
 .AppleDouble
