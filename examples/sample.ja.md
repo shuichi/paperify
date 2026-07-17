@@ -8,6 +8,14 @@ authors:
     email: "alice@example.edu"
   - name: "ボブ・エグザンプル"
     affiliation: "エグザンプル研究所"
+  - name: "ボブ・エグザンプル"
+    affiliation: "エグザンプル研究所"
+  - name: "ボブ・エグザンプル"
+    affiliation: "エグザンプル研究所"
+  - name: "ボブ・エグザンプル"
+    affiliation: "エグザンプル研究所"
+  - name: "ボブ・エグザンプル"
+    affiliation: "エグザンプル研究所"
 date: "2026-07-04"
 abstract: |
   本稿では、オンラインで読みやすく、二段組みの印刷出力にも適した軽量なMarkdown-to-HTMLコンバーターであるPaperifyについて述べる。Paperifyは、必要最小限のセマンティックなHTMLを生成し、画面表示と印刷のレイアウトおよびタイポグラフィは、丁寧に設計されたスタイルシートに委ねる。数式、図、表、コード、脚注、動画といった要素をプレーンなMarkdownで表現しながら、印刷に耐える文書として仕上げられることを示す。
