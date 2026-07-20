@@ -362,3 +362,6 @@ test/
 ## ライセンス
 
 GPL-3.0-only
+
+Paperify が使用している第三者のオープンソースコンポーネントについては、
+[ACKNOWLEDGMENTS.md](./ACKNOWLEDGMENTS.md) を参照してください。

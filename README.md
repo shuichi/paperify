@@ -363,3 +363,6 @@ test/
 ## License
 
 GPL-3.0-only
+
+Third-party open-source components used by Paperify are listed in
+[ACKNOWLEDGMENTS.md](./ACKNOWLEDGMENTS.md).
