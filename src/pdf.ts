@@ -19,6 +19,7 @@ export interface PaperifyPdfOptions {
   printBackground: boolean
   preferCSSPageSize: boolean
   waitForFonts: boolean
+  scale: number
   displayHeaderFooter?: boolean
   headerTemplate?: string
   footerTemplate?: string
@@ -108,7 +109,10 @@ export function buildPdfOptions(options: RenderPdfOptions): PaperifyPdfOptions {
     path: options.outputPath,
     printBackground: true,
     preferCSSPageSize: true,
-    waitForFonts: true
+    waitForFonts: true,
+    // Keep physical CSS units at 100%. The stylesheet must also prevent
+    // horizontal overflow, which triggers Chromium's separate shrink-to-fit.
+    scale: 1
   }
 
   if (hasHeaderFooter) {

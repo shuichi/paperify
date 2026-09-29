@@ -25,6 +25,8 @@ export interface PaperMeta {
   bibliography?: string
   headerTemplate?: string
   footerTemplate?: string
+  /** Absolute print math size, normalized to a positive CSS pt length. */
+  printMathSize?: string
   /**
    * Opt-in flag for integrations such as the VS Code preview. Only the YAML
    * boolean `true` counts; it is never rendered into the generated HTML.
@@ -44,6 +46,23 @@ function asString(value: unknown): string | undefined {
   if (value instanceof Date) return formatDate(value)
   const s = String(value).trim()
   return s.length > 0 ? s : undefined
+}
+
+/** Accept only positive, finite point sizes; unitless YAML numbers mean pt. */
+export function normalizePrintMathSize(value: unknown): string | undefined {
+  let points: number
+  if (typeof value === 'number') {
+    points = value
+  } else if (typeof value === 'string') {
+    const length = value.trim()
+    if (!/^(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?pt$/i.test(length)) {
+      return undefined
+    }
+    points = Number(length.slice(0, -2))
+  } else {
+    return undefined
+  }
+  return Number.isFinite(points) && points > 0 ? `${points}pt` : undefined
 }
 
 /** Format a Date as YYYY-MM-DD (UTC), the least surprising form for papers. */
@@ -114,6 +133,7 @@ export function parseFrontmatter(source: string): FrontmatterResult {
     bibliography: asString(data.bibliography),
     headerTemplate: asString(data.headerTemplate),
     footerTemplate: asString(data.footerTemplate),
+    printMathSize: normalizePrintMathSize(data.printMathSize),
     paperify: data.paperify === true ? true : undefined
   }
 

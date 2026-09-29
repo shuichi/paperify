@@ -58,6 +58,7 @@
 
   /* Print knobs (used inside @media print below) */
   --print-body-size: 9.5pt;
+  --print-math-size: 8.5pt;
   --print-line-height: 1.45;
   --print-column-gap: 7mm;
 }
@@ -682,6 +683,12 @@ hr {
   body {
     font-size: var(--print-body-size);
     line-height: var(--print-line-height);
+    /* Long URLs/identifiers must fit their column, including table cells
+       and front matter. `anywhere` also reduces min-content widths; merely
+       using break-word leaves tables able to widen the printed page.
+       Horizontal overflow makes Chromium shrink the ENTIRE document,
+       even with PDF scale: 1, changing the physical point sizes below. */
+    overflow-wrap: anywhere;
   }
 
   .paper {
@@ -794,8 +801,10 @@ hr {
     margin-top: 1.5mm;
   }
 
-  .paper-content figure img {
+  /* Inline images need the same constraint as figure images. */
+  .paper-content img {
     max-width: 100%;
+    height: auto;
   }
 
   /* ---- Video degrades to poster / placeholder ------------------------ */
@@ -874,7 +883,11 @@ hr {
   /* ---- Math ------------------------------------------------------------ */
 
   .katex {
-    font-size: 1.05em;           /* restrained relative to KaTeX's default */
+    font-size: var(--print-math-size);
+    /* KaTeX's subscript strut (.vlist-s) protrudes 2px beyond its layout
+       width. Reserve that space at justified line ends so even this
+       invisible overflow cannot trigger whole-document print shrinking. */
+    padding-right: 2px;
   }
 
   .katex-display {

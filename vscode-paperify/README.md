@@ -112,6 +112,13 @@ standard install locations; if yours lives elsewhere, set:
 - `paperify.pdf.browserExecutable` — absolute path to the browser executable
   used for Mermaid rendering and PDF export.
 
+All PDF math uses a fixed base size of **8.5pt** by default. To change it for
+a document, add `printMathSize: 8pt` (or a positive number such as `8`, in
+points) to its existing YAML frontmatter. This controls inline and display
+math together, preserving the relative sizes of subscripts and superscripts.
+Body text and the on-screen preview keep their own font sizes. The same
+setting is included in exported HTML for printing from a browser.
+
 ## Security
 
 - Webview scripts are disabled (`enableScripts: false`).

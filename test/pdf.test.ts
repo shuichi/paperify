@@ -21,7 +21,8 @@ describe('PDF rendering options', () => {
       path: '/tmp/output.pdf',
       printBackground: true,
       preferCSSPageSize: true,
-      waitForFonts: true
+      waitForFonts: true,
+      scale: 1
     })
     expect(options.displayHeaderFooter).toBeUndefined()
     expect(options.headerTemplate).toBeUndefined()
@@ -117,6 +118,7 @@ describe('renderPdf', () => {
       printBackground: true,
       preferCSSPageSize: true,
       waitForFonts: true,
+      scale: 1,
       displayHeaderFooter: true,
       headerTemplate: '<div>header</div>'
     })

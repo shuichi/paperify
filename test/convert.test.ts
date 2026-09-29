@@ -9,6 +9,7 @@ import { parseFrontmatter } from '../src/frontmatter.js'
 import { inferVideoType } from '../src/transforms/videoDirective.js'
 import type { MermaidRenderer } from '../src/mermaid.js'
 import { BrowserLaunchError } from '../src/pdf.js'
+import { renderDocument } from '../src/template.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
@@ -97,6 +98,27 @@ describe('frontmatter parsing', () => {
     )
 
     expect(meta.bibliography).toBe('references/paper.bib')
+  })
+
+  it.each([
+    ['8.5', '8.5pt'],
+    ['9', '9pt'],
+    ['" 8.50pt "', '8.5pt'],
+    ['".5pt"', '0.5pt']
+  ])('normalizes print math size %s to an absolute point size', (value, expected) => {
+    const { meta } = parseFrontmatter(`---\nprintMathSize: ${value}\n---\nbody\n`)
+    expect(meta.printMathSize).toBe(expected)
+  })
+
+  it.each([
+    '0', '-1', '.inf', '.nan', 'false', 'null', '[]', '{}',
+    '"8.5"', '"8.5em"', '"8.5vw"', '"-8.5pt"', '"0pt"',
+    '"NaNpt"', '"Infinitypt"', '"1e999pt"',
+    '"8pt; color: red"',
+    '"8pt; } }</style><script>alert(1)</script>"'
+  ])('ignores invalid print math size %s', (value) => {
+    const { meta } = parseFrontmatter(`---\nprintMathSize: ${value}\n---\nbody\n`)
+    expect(meta.printMathSize).toBeUndefined()
   })
 
   it('accepts only the YAML boolean true for the paperify flag', () => {
@@ -290,6 +312,48 @@ describe('math rendering', () => {
   it('omits the KaTeX stylesheet when the document has no math', async () => {
     const { html } = await convert('# No math here\n')
     expect(html).not.toContain('katex.min.css')
+  })
+
+  it.each(['link', 'embed'] as const)(
+    'applies one print-only math size after the %s stylesheet',
+    async (mode) => {
+      const { html, contentHtml, meta } = await convert(
+        '---\nprintMathSize: 8\n---\nInline $x$ math.\n\n$$\ny = x^2\n$$\n',
+        { css: mode === 'link' ? { mode, href: 'paperify.css' } : { mode, content: css } }
+      )
+      const override = '@media print { :root { --print-math-size: 8pt; } }'
+      const stylesheet = mode === 'link' ? 'href="paperify.css"' : css
+      expect(meta.printMathSize).toBe('8pt')
+      expect(html).toContain(override)
+      expect(html.indexOf(override)).toBeGreaterThan(html.indexOf(stylesheet))
+      expect(contentHtml).toContain('class="katex"')
+      expect(contentHtml).toContain('class="katex-display"')
+      expect(html).not.toContain('<script')
+    }
+  )
+
+  it('omits a document math size override when no size is supplied', async () => {
+    const { html } = await convert('Inline $x$ math.\n')
+    expect(html).not.toContain('--print-math-size')
+  })
+
+  it('rejects CSS and HTML injection from frontmatter and direct template callers', async () => {
+    const maliciousSize = '8pt; } }</style><script>alert(1)</script>'
+    const { html } = await convert(
+      `---\nprintMathSize: "${maliciousSize}"\n---\n$x$\n`
+    )
+    const directHtml = renderDocument({
+      meta: { authors: [], keywords: [], printMathSize: maliciousSize },
+      contentHtml: '<p>Body</p>',
+      lang: 'en',
+      css: { mode: 'link', href: 'paperify.css' },
+      hasMath: false
+    })
+    for (const document of [html, directHtml]) {
+      expect(document).not.toContain('--print-math-size')
+      expect(document).not.toContain('<script')
+      expect(document).not.toContain(maliciousSize)
+    }
   })
 })
 

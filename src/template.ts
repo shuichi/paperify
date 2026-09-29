@@ -6,7 +6,7 @@
  */
 
 import { createRequire } from 'node:module'
-import type { PaperMeta } from './frontmatter.js'
+import { normalizePrintMathSize, type PaperMeta } from './frontmatter.js'
 
 export type CssMode =
   | { mode: 'link'; href: string }
@@ -99,7 +99,7 @@ function renderHeader(meta: PaperMeta): string {
   return out
 }
 
-function renderCss(css: CssMode, hasMath: boolean): string {
+function renderCss(css: CssMode, hasMath: boolean, printMathSize?: string): string {
   let out = ''
   if (hasMath) {
     // KaTeX HTML output is static; only its stylesheet (and web fonts)
@@ -110,6 +110,11 @@ function renderCss(css: CssMode, hasMath: boolean): string {
     out += `  <link rel="stylesheet" href="${escapeHtml(css.href)}">\n`
   } else {
     out += `  <style>\n${css.content}\n  </style>\n`
+  }
+  // Revalidate for direct template callers as well as parsed frontmatter.
+  const mathSize = normalizePrintMathSize(printMathSize)
+  if (mathSize) {
+    out += `  <style>\n@media print { :root { --print-math-size: ${mathSize}; } }\n  </style>\n`
   }
   return out
 }
@@ -139,7 +144,7 @@ export function renderDocument(options: TemplateOptions): string {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="generator" content="paperify">
 ${authorMeta}${keywordsMeta}${description}  <title>${escapeHtml(title)}</title>
-${renderCss(css, hasMath)}</head>
+${renderCss(css, hasMath, meta.printMathSize)}</head>
 <body>
 <main class="paper">
 ${renderHeader(meta)}${renderAbstract(meta)}${renderKeywords(meta)}  <article class="paper-content">

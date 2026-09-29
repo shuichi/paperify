@@ -144,6 +144,31 @@ describe('exportPdfToFile', () => {
     expect(fs.existsSync(path.dirname(run.pdfOptions[0].path))).toBe(false)
   })
 
+  it('preserves the document print math size in the compiled HTML sent to PDF', async () => {
+    const run = fakeLauncher()
+
+    await exportPdfToFile({
+      markdown: DOC.replace('paperify: true', 'paperify: true\nprintMathSize: 8')
+        .replace('Body text.', () => 'Inline $x$ math.\n\n$$\ny = x^2\n$$'),
+      inputDir: fixturesDir,
+      outputPath: path.join(makeOutputDir(), 'math.pdf'),
+      css: ':root { --print-math-size: 8.5pt; }',
+      browserExecutablePath: process.execPath,
+      launch: run.launcher
+    })
+
+    const html = run.htmlSeenByBrowser[0]
+    const body = html.slice(html.indexOf('<body>'))
+    const override = '@media print { :root { --print-math-size: 8pt; } }'
+    expect(html).toContain(override)
+    expect(html.indexOf(override)).toBeGreaterThan(html.indexOf('--print-math-size: 8.5pt'))
+    expect(html.indexOf(override)).toBeLessThan(html.indexOf('</head>'))
+    expect(body).toContain('class="katex"')
+    expect(body).toContain('class="katex-display"')
+    expect(html.includes('href="https://cdn.jsdelivr.net/npm/katex')).toBe(false)
+    expect(run.pdfOptions[0]).toMatchObject({ scale: 1 })
+  })
+
   it('fails fast with guidance when the configured executable does not exist', async () => {
     const run = fakeLauncher()
 

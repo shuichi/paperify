@@ -133,6 +133,22 @@ All fields are optional. Authors may also be plain strings, and keywords may be 
 
 Math is rendered **statically at build time** with KaTeX — the output HTML needs no JavaScript to display equations. Compiled HTML embeds the KaTeX stylesheet and fonts from the installed `katex` package.
 
+PDF/print math has a fixed base size of **8.5pt**, independent of the body
+font size. Set `printMathSize` in the document's YAML frontmatter to change
+all inline and display math together, including when exporting from VS Code:
+
+```yaml
+---
+paperify: true
+printMathSize: 8pt
+---
+```
+
+A positive number such as `8` also means points. Subscripts and superscripts
+retain KaTeX's proportions. This setting applies to print/PDF; screen math
+keeps its usual sizing. Custom stylesheets can set `--print-math-size` instead;
+an explicit frontmatter value takes precedence over that CSS variable.
+
 In print, display equations are kept inside their column, sized with restraint, and prevented from breaking across columns where the engine supports it. On screen, very long equations scroll horizontally instead of overflowing.
 
 ### Citations and references
@@ -277,6 +293,14 @@ paperify paper.md -o paper.pdf
 
 Paperify uses Puppeteer to open the compiled HTML file and print with Chromium's `print` media type, `preferCSSPageSize`, and background graphics enabled. The stylesheet's `@page` rule controls the A4 page size and margins.
 
+The print body size is an absolute `9.5pt` by default (`--print-body-size`),
+and direct PDF export uses 100% scale. The print stylesheet wraps long URLs,
+identifiers, and table-cell text, and constrains images to the column width:
+horizontal overflow can otherwise make Chromium shrink the entire document,
+even at 100% scale. Keep these rules when customizing the stylesheet.
+Split display equations that exceed a print column into multiple lines in the
+math source.
+
 PDF headers and footers can be controlled from YAML frontmatter:
 
 ```yaml
@@ -311,6 +335,8 @@ The stylesheet is the deliverable that does the visual work — the HTML is inte
 :root {
   --font-body: Georgia, "Times New Roman", serif;
   --paper-width: 72ch;
+  --print-body-size: 11pt;
+  --print-math-size: 8.5pt;
   --accent-color: #8b0000;
 }
 ```
@@ -320,9 +346,14 @@ Options for theming:
 - **Pass your own stylesheet** with `--css mytheme.css` (start from a copy of `styles/paperify.css`; custom CSS replaces the bundled stylesheet).
 - **Override variables** by editing a copied stylesheet or adding overrides to a custom stylesheet.
 - **Use language-aware defaults** by setting `lang: ja` in frontmatter or passing `--lang ja`; `paperify.css` applies Japanese body and heading fonts with `:root:lang(ja)`.
-- Print-specific knobs (`--print-body-size`, `--print-line-height`, `--print-column-gap`) live in the same `:root` block.
+- Print-specific knobs (`--print-body-size`, `--print-math-size`, `--print-line-height`, `--print-column-gap`) live in the same `:root` block.
 
 The file is organized into numbered, commented sections (tokens → base → reading column → front matter → content → print) so it is safe to edit surgically.
+
+To check physical font sizes in generated PDFs as well as the unit tests, run
+`PAPERIFY_TEST_BROWSER=/path/to/chrome npm test`. These optional browser tests
+measure the PDF's text transforms, so whole-document print scaling is detected
+even when computed CSS font sizes are unchanged.
 
 ## Limitations
 

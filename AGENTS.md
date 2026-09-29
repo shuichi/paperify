@@ -86,6 +86,7 @@ Supported fields:
 - `lang` or `language`
 - `headerTemplate`
 - `footerTemplate`
+- `printMathSize` (positive point size for all PDF/print math, e.g. `8pt` or `8`)
 - `paperify` (opt-in flag for integrations such as the VS Code preview; only
   the YAML boolean `true` counts, and it is never rendered into the HTML)
 
@@ -190,6 +191,7 @@ as CSS custom properties. Important defaults include:
 - Screen reading width: `--paper-width: 78ch`.
 - Screen body size: `--body-size: 16px`.
 - Print body size: `--print-body-size: 9.5pt`.
+- Print math base size: `--print-math-size: 8.5pt`, independent of body size.
 - Print line height: `--print-line-height: 1.45`.
 - Print column gap: `--print-column-gap: 7mm`.
 
