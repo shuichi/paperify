@@ -2,7 +2,7 @@
   "name": "paperify-preview",
   "displayName": "Paperify Preview",
   "description": "Preview Paperify Markdown documents (paperify: true) inside VS Code, and export them to standalone HTML or PDF.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "shuichi-kurabayashi",
   "license": "GPL-3.0-only",
   "private": true,
