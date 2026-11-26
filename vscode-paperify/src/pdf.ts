@@ -26,7 +26,7 @@ import {
   renderPdf,
   type PdfBrowserLauncher
 } from 'paperify/pdf'
-import type { MermaidRenderer } from 'paperify/api'
+import { assertDistinctOutputPath, type MermaidRenderer } from 'paperify/api'
 
 import { buildCompiledHtml } from './build'
 
@@ -147,15 +147,23 @@ export function resolveBrowserExecutablePath(
   return detectBrowserExecutable()
 }
 
-async function moveFile(from: string, to: string): Promise<void> {
+async function publishPdf(from: string, to: string): Promise<void> {
   await fs.promises.mkdir(path.dirname(to), { recursive: true })
   try {
     await fs.promises.rename(from, to)
   } catch (error) {
     // Temp and destination can live on different volumes.
     if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error
-    await fs.promises.copyFile(from, to)
-    await fs.promises.unlink(from)
+    const stagingDir = await fs.promises.mkdtemp(
+      path.join(path.dirname(to), '.paperify-pdf-')
+    )
+    try {
+      const stagedPdf = path.join(stagingDir, 'document.pdf')
+      await fs.promises.copyFile(from, stagedPdf)
+      await fs.promises.rename(stagedPdf, to)
+    } finally {
+      await fs.promises.rm(stagingDir, { recursive: true, force: true })
+    }
   }
 }
 
@@ -163,6 +171,9 @@ async function moveFile(from: string, to: string): Promise<void> {
 export async function exportPdfToFile(
   request: ExportPdfRequest
 ): Promise<ExportPdfResult> {
+  if (request.documentPath) {
+    assertDistinctOutputPath(request.documentPath, request.outputPath)
+  }
   const executablePath = resolveBrowserExecutablePath(
     request.browserExecutablePath
   )
@@ -203,7 +214,7 @@ export async function exportPdfToFile(
     )
 
     // Only a fully rendered PDF ever reaches the destination.
-    await moveFile(tempPdfPath, request.outputPath)
+    await publishPdf(tempPdfPath, request.outputPath)
   } finally {
     await fs.promises.rm(tempDir, { recursive: true, force: true })
   }

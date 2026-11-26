@@ -13,11 +13,12 @@ import path from 'node:path'
 import process from 'node:process'
 
 import { convert } from './convert.js'
-import { copyAssets } from './assets.js'
+import { copyAssets, resolveLocalAsset } from './assets.js'
 import { compileHtml } from './compile.js'
 import { renderPdf } from './pdf.js'
+import { assertDistinctOutputPath } from './outputPath.js'
 import { createMermaidRenderer } from './mermaid.js'
-import { readStyleBundle, resolveCssPaths } from './styleSources.js'
+import { defaultCssPath, readStyleBundle } from './styleSources.js'
 import type { CssMode } from './template.js'
 import { DEFAULT_CSL_STYLE, fetchCslStyle } from './csl.js'
 import { parseFrontmatter } from './frontmatter.js'
@@ -25,8 +26,7 @@ import {
   defaultBibPathForInput,
   extractTrailingBibtexBlock,
   markdownContainsCitations,
-  resolveBibliographySource,
-  type BibliographySource
+  resolveBibliographySource
 } from './bibliography.js'
 
 const HELP = `paperify — CSS-first academic Markdown-to-HTML publishing
@@ -199,33 +199,27 @@ function compiledHtmlPathForOutput(output: string): string {
   return path.join(parsed.dir, `${parsed.name}.html`)
 }
 
-function bibliographySourceForMarkdown(
+async function buildOnce(
   options: CliOptions,
-  markdown: string
-): BibliographySource | undefined {
-  const extracted = extractTrailingBibtexBlock(markdown)
-  const { meta } = parseFrontmatter(extracted.markdown)
-
-  return resolveBibliographySource({
-    inputPath: options.input,
-    cliBibFile: options.bibFile,
-    frontmatterBibliography: meta.bibliography,
-    embeddedBibtex: extracted.bibtex
-  })
-}
-
-async function buildOnce(options: CliOptions): Promise<void> {
+  trackFile?: (filePath: string) => void
+): Promise<void> {
+  trackFile?.(options.input)
   if (!fs.existsSync(options.input)) {
     throw new CliError(`Input file not found: ${options.input}`)
   }
+
+  const outputIsPdf = isPdfOutput(options.output)
+  const compiledHtmlPath = path.resolve(compiledHtmlPathForOutput(options.output))
+  assertDistinctOutputPath(options.input, compiledHtmlPath)
+  if (outputIsPdf) assertDistinctOutputPath(options.input, options.output)
 
   const rawMarkdown = fs.readFileSync(options.input, 'utf8')
   const extracted = extractTrailingBibtexBlock(rawMarkdown)
   const markdown = extracted.markdown
   const frontmatter = parseFrontmatter(markdown)
   const { meta } = frontmatter
+  trackFile?.(options.cssFile ?? defaultCssPath())
   const styleBundle = readStyleBundle(options)
-  const outputIsPdf = isPdfOutput(options.output)
   const inputDir = path.dirname(path.resolve(options.input))
   const bibliographySource = resolveBibliographySource({
     inputPath: options.input,
@@ -233,6 +227,7 @@ async function buildOnce(options: CliOptions): Promise<void> {
     frontmatterBibliography: meta.bibliography,
     embeddedBibtex: extracted.bibtex
   })
+  if (!bibliographySource) trackFile?.(defaultBibPathForInput(options.input))
   let citations:
     | { bibtex: string; cslXml: string; styleId: string }
     | undefined
@@ -240,6 +235,7 @@ async function buildOnce(options: CliOptions): Promise<void> {
   if (bibliographySource) {
     let bibtex: string
     if (bibliographySource.kind === 'file') {
+      trackFile?.(bibliographySource.path)
       if (!fs.existsSync(bibliographySource.path)) {
         throw new CliError(`BibTeX file not found: ${bibliographySource.path}`)
       }
@@ -293,10 +289,13 @@ async function buildOnce(options: CliOptions): Promise<void> {
   })()
 
   const outputDir = path.dirname(path.resolve(options.output))
-  const compiledHtmlPath = path.resolve(compiledHtmlPathForOutput(options.output))
-  const compiledHtmlDir = path.dirname(compiledHtmlPath)
+  if (trackFile) {
+    for (const ref of result.assets) {
+      const asset = resolveLocalAsset(ref, inputDir)
+      if (asset) trackFile(asset.filePath)
+    }
+  }
   fs.mkdirSync(outputDir, { recursive: true })
-  fs.mkdirSync(compiledHtmlDir, { recursive: true })
 
   const compiled = compileHtml({
     html: result.html,
@@ -331,8 +330,8 @@ async function buildOnce(options: CliOptions): Promise<void> {
     if (copied.length > 0) {
       console.log(`paperify: copied ${copied.length} asset(s): ${copied.join(', ')}`)
     }
-    for (const m of missing) {
-      console.warn(`paperify: warning: asset not found, skipped: ${m}`)
+    for (const asset of missing) {
+      console.warn(`paperify: warning: asset could not be copied: ${asset}`)
     }
   }
 
@@ -342,43 +341,66 @@ async function buildOnce(options: CliOptions): Promise<void> {
   }
 }
 
-function watchAndRebuild(options: CliOptions): void {
-  const targets = new Set<string>([path.resolve(options.input)])
-  for (const cssPath of resolveCssPaths(options)) targets.add(cssPath)
-  try {
-    const markdown = fs.readFileSync(options.input, 'utf8')
-    const bibliographySource = bibliographySourceForMarkdown(options, markdown)
-    if (bibliographySource?.kind === 'file') targets.add(bibliographySource.path)
-  } catch {
-    // buildOnce reports the actionable error; watch still tracks the input file.
-  }
-
+function watchAndRebuild(options: CliOptions): () => void {
+  const targets = new Set<string>()
   let timer: NodeJS.Timeout | undefined
-  const rebuild = () => {
+  let running = false
+  let pending = false
+  let stopped = false
+  const onChange = (current: fs.Stats, previous: fs.Stats) => {
+    // watchFile also reports an initially missing optional bibliography.
+    if (!current.nlink && !previous.nlink) return
     clearTimeout(timer)
-    timer = setTimeout(() => {
-      buildOnce(options).catch((err) => {
-        console.error(`paperify: error: ${err instanceof Error ? err.message : err}`)
-      })
-    }, 120)
+    timer = setTimeout(rebuild, 120)
   }
 
-  for (const target of targets) {
+  async function rebuild(): Promise<void> {
+    if (running) {
+      pending = true
+      return
+    }
+    running = true
+    const nextTargets = new Set<string>()
     try {
-      fs.watch(target, { persistent: true }, rebuild)
+      await buildOnce(options, (filePath) => {
+        const target = path.resolve(filePath)
+        nextTargets.add(target)
+        if (stopped || targets.has(target)) return
+        // Watch the path across editor saves that replace the original inode.
+        fs.watchFile(target, { interval: 250 }, onChange)
+        targets.add(target)
+      })
     } catch (err) {
-      console.warn(
-        `paperify: warning: cannot watch ${target}: ${err instanceof Error ? err.message : err}`
-      )
+      console.error(`paperify: error: ${err instanceof Error ? err.message : err}`)
+    }
+    for (const target of targets) {
+      if (nextTargets.has(target)) continue
+      fs.unwatchFile(target, onChange)
+      targets.delete(target)
+    }
+    running = false
+    if (pending && !stopped) {
+      pending = false
+      void rebuild()
     }
   }
+
+  void rebuild()
   console.log('paperify: watching for changes (press Ctrl+C to stop)…')
+  return () => {
+    stopped = true
+    clearTimeout(timer)
+    for (const target of targets) fs.unwatchFile(target, onChange)
+    targets.clear()
+  }
 }
 
-async function main(): Promise<void> {
+export async function main(
+  argv: string[] = process.argv.slice(2)
+): Promise<void | (() => void)> {
   let options: CliOptions | 'help'
   try {
-    options = parseArgs(process.argv.slice(2))
+    options = parseArgs(argv)
   } catch (err) {
     console.error(err instanceof Error ? err.message : String(err))
     process.exitCode = 1
@@ -390,17 +412,14 @@ async function main(): Promise<void> {
     return
   }
 
+  if (options.watch) return watchAndRebuild(options)
+
   try {
     await buildOnce(options)
   } catch (err) {
     console.error(`paperify: error: ${err instanceof Error ? err.message : err}`)
     process.exitCode = 1
-    return
-  }
-
-  if (options.watch) {
-    watchAndRebuild(options)
   }
 }
 
-main()
+if (import.meta.main) void main()

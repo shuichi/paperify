@@ -34,6 +34,23 @@ const PAPERIFY_DOC = [
 ].join('\n')
 
 describe('exportHtmlToFile', () => {
+  it('protects the Markdown source when the chosen HTML file links to it', async () => {
+    const dir = makeOutputDir()
+    const documentPath = path.join(dir, 'paper.md')
+    const outputPath = path.join(dir, 'paper.html')
+    fs.writeFileSync(documentPath, PAPERIFY_DOC)
+    fs.linkSync(documentPath, outputPath)
+
+    await expect(exportHtmlToFile({
+      markdown: PAPERIFY_DOC,
+      inputDir: dir,
+      documentPath,
+      outputPath,
+      css: ''
+    })).rejects.toThrow(/overwrite the input document/)
+    expect(fs.readFileSync(documentPath, 'utf8')).toBe(PAPERIFY_DOC)
+  })
+
   it('writes compiled standalone HTML without webview-only layers', async () => {
     const outputPath = path.join(makeOutputDir(), 'nested', 'paper.html')
 

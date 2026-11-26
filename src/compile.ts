@@ -9,14 +9,18 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
+import { parse, type DefaultTreeAdapterTypes } from 'parse5'
 
-import { isLocalAsset } from './assets.js'
+import { resolveLocalAsset } from './assets.js'
+import { escapeHtml } from './template.js'
 
 export interface CompileOptions {
   /** Complete Paperify HTML document. */
   html: string
   /** Directory used to resolve local Markdown asset references. */
   inputDir: string
+  /** Optional host URI for a local video file, e.g. in a VS Code webview. */
+  resolveMediaSource?: (absolutePath: string) => string
 }
 
 export interface CompileResult {
@@ -49,51 +53,56 @@ function fileToDataUri(filePath: string): string {
   return `data:${mimeForPath(filePath)};base64,${data.toString('base64')}`
 }
 
-function decodeHtmlAttribute(value: string): string {
-  return value
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-}
-
-function inlineLocalAsset(
-  ref: string,
-  inputDir: string,
-  warnings: string[],
-  label: string
-): string {
-  const decoded = decodeHtmlAttribute(ref)
-  if (!isLocalAsset(decoded)) return ref
-
-  const filePath = path.resolve(inputDir, decoded)
-  if (!fs.existsSync(filePath)) {
-    warnings.push(`${label} asset not found, left as-is: ${decoded}`)
-    return ref
-  }
-
-  return fileToDataUri(filePath)
-}
-
 function inlineAssetAttributes(
-  html: string,
-  inputDir: string,
+  { html, inputDir, resolveMediaSource }: CompileOptions,
   warnings: string[]
 ): string {
-  let out = html.replace(
-    /(<img\b[^>]*?\bsrc=")([^"]*)(")/gi,
-    (_match, before: string, src: string, after: string) =>
-      `${before}${inlineLocalAsset(src, inputDir, warnings, 'image')}${after}`
-  )
-
-  out = out.replace(
-    /(<video\b[^>]*?\bposter=")([^"]*)(")/gi,
-    (_match, before: string, poster: string, after: string) =>
-      `${before}${inlineLocalAsset(poster, inputDir, warnings, 'video poster')}${after}`
-  )
-
-  return out
+  if (!/<(?:img|video|source)\b/i.test(html)) return html
+  const replacements: { start: number; end: number; text: string }[] = []
+  function rewrite(
+    node: DefaultTreeAdapterTypes.Element,
+    name: string,
+    label: string,
+    mapSource?: (absolutePath: string) => string
+  ) {
+    const attr = node.attrs.find((attr) => attr.name === name)
+    const location = node.sourceCodeLocation?.attrs?.[name]
+    if (!attr || !location) return
+    const asset = resolveLocalAsset(attr.value, inputDir)
+    if (!asset) return
+    if (!fs.statSync(asset.filePath, { throwIfNoEntry: false })?.isFile()) {
+      warnings.push(`${label} asset not found, left as-is: ${attr.value}`)
+      return
+    }
+    const value = mapSource
+      ? mapSource(asset.filePath) + asset.search + asset.hash
+      : fileToDataUri(asset.filePath) + asset.hash
+    replacements.push({
+      start: location.startOffset,
+      end: location.endOffset,
+      text: `${name}="${escapeHtml(value)}"`
+    })
+  }
+  function visit(node: DefaultTreeAdapterTypes.ChildNode) {
+    if (!('tagName' in node)) return
+    if (node.tagName === 'img') rewrite(node, 'src', 'image')
+    if (node.tagName === 'video') rewrite(node, 'poster', 'video poster')
+    if (resolveMediaSource && (node.tagName === 'source' || node.tagName === 'video')) {
+      rewrite(node, 'src', 'video', resolveMediaSource)
+    }
+    node.childNodes.forEach(visit)
+  }
+  // Use the parser's decoded attribute value and splice its original source
+  // range. All bytes outside the rewritten attributes (including CSS) survive.
+  parse(html, { sourceCodeLocationInfo: true }).childNodes.forEach(visit)
+  const parts: string[] = []
+  let cursor = 0
+  for (const { start, end, text } of replacements.sort((a, b) => a.start - b.start)) {
+    parts.push(html.slice(cursor, start), text)
+    cursor = end
+  }
+  parts.push(html.slice(cursor))
+  return parts.join('')
 }
 
 function isExternalCssUrl(value: string): boolean {
@@ -153,7 +162,6 @@ function inlineKatexStylesheet(html: string, warnings: string[]): string {
 
 export function compileHtml(options: CompileOptions): CompileResult {
   const warnings: string[] = []
-  let html = inlineKatexStylesheet(options.html, warnings)
-  html = inlineAssetAttributes(html, options.inputDir, warnings)
+  const html = inlineKatexStylesheet(inlineAssetAttributes(options, warnings), warnings)
   return { html, warnings }
 }

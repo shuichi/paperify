@@ -51,6 +51,29 @@ describe('frontmatter parsing', () => {
     expect(content).toContain('# Just a heading')
   })
 
+  it('keeps a leading thematic break without a closing YAML delimiter', () => {
+    const source = '---\n\n# A paper\n'
+    expect(parseFrontmatter(source).content).toBe(source)
+  })
+
+  it('accepts only YAML frontmatter, including with a BOM and CRLF', () => {
+    const json = '---json\n{"paperify": true}\n---\nBody'
+    expect(parseFrontmatter(json).content).toBe(json)
+    expect(parseFrontmatter(json).meta.paperify).toBeUndefined()
+    const yaml = parseFrontmatter(
+      '\uFEFF---  YML  \r\npaperify: true\r\n---draft: yes\r\n---  \r\nBody'
+    )
+    expect(yaml.meta.paperify).toBe(true)
+    expect(yaml.content).toBe('Body')
+  })
+
+  it('consistently rejects malformed YAML on repeated preview builds', () => {
+    const source = '---\ntitle: [incomplete\n---\nBody'
+    for (let i = 0; i < 2; i++) {
+      expect(() => parseFrontmatter(source)).toThrow()
+    }
+  })
+
   it('normalizes string authors and comma-separated keywords', () => {
     const src = '---\nauthors: "Solo Author"\nkeywords: "a, b, c"\n---\ntext\n'
     const { meta } = parseFrontmatter(src)
@@ -245,6 +268,24 @@ describe('Mermaid diagrams', () => {
     expect(result.contentHtml.match(/class="image-figure mermaid-figure"/g)).toHaveLength(2)
   })
 
+  it('preserves generated Mermaid SVGs when raw HTML is sanitized', async () => {
+    const renderer: MermaidRenderer = async () => [{ ok: true, value: { svg } }]
+    const { contentHtml } = await convert(
+      '```mermaid\ngraph TD\nA-->B\n```\n\n<img src="data:text/plain,raw" alt="raw">',
+      { mermaid: { renderer }, unsafeHtml: true }
+    )
+    expect(contentHtml).toContain('src="data:image/svg+xml;base64,')
+    expect(contentHtml).toContain('<img alt="raw">')
+  })
+
+  it('keeps mixed preformatted HTML with a Mermaid code child intact', async () => {
+    const { contentHtml } = await convert(
+      '<pre><code class="language-mermaid">graph TD</code><em>annotation</em></pre>',
+      { mermaid: { renderer: async () => [] }, unsafeHtml: true }
+    )
+    expect(contentHtml).toContain('<em>annotation</em></pre>')
+  })
+
   it('keeps source code and warns when no renderer is provided', async () => {
     const { contentHtml, warnings } = await convert(
       '```mermaid\ngraph TD\nA-->B\n```\n'
@@ -403,6 +444,24 @@ describe('citations', () => {
     expect(contentHtml).toContain('Lamport, 1994')
   })
 
+  it.each([false, true])('keeps citation markup out of link destinations and heading IDs (unsafeHtml=%s)', async (unsafeHtml) => {
+    const literal = 'PAPERIFY_CITATION_PLACEHOLDER_1_'
+    const markdown = [
+      '# Findings [@knuth1984texbook]',
+      `[See *work [@knuth1984texbook]*](report/${literal})`,
+      literal
+    ].join('\n\n')
+    const { contentHtml } = await convert(markdown, {
+      citations: { bibtex, cslXml: apaCsl }, unsafeHtml
+    })
+
+    expect(contentHtml).toContain('<h1 id="findings-knuth-1984">Findings <a class="citation"')
+    expect(contentHtml).toContain(
+      `<a href="report/${literal}">See <em>work <span class="citation" data-cites="knuth1984texbook">(Knuth, 1984)</span></em></a>`
+    )
+    expect(contentHtml).toContain(`<p>${literal}</p>`)
+  })
+
   it('fails clearly for unknown citation keys', async () => {
     await expect(
       convert('Missing [@missing].\n', {
@@ -435,6 +494,15 @@ describe('image figures', () => {
     const { contentHtml } = await convert('See ![icon](i.png) inline.\n')
     expect(contentHtml).toContain('<p>')
     expect(contentHtml).not.toContain('<figure')
+  })
+
+  it('promotes reference-style images and preserves their titles and paths', async () => {
+    const { contentHtml, assets } = await convert(
+      '![Plot][figure]\n\nSee ![icon][figure] inline.\n\n[figure]: <a b.png> "Graph"'
+    )
+    expect(contentHtml).toContain('<figure class="image-figure"><img src="a%20b.png" alt="Plot" title="Graph"><figcaption>Plot</figcaption></figure>')
+    expect(contentHtml).toContain('<p>See <img src="a%20b.png" alt="icon" title="Graph"> inline.</p>')
+    expect(assets).toEqual(['a%20b.png'])
   })
 })
 
@@ -493,6 +561,22 @@ describe('video directive', () => {
 })
 
 describe('raw HTML handling', () => {
+  it('filters unsafe URLs in Markdown links and video fallbacks by default', async () => {
+    const { contentHtml } = await convert([
+      '[unused](JaVaScRiPt:) and [data](data:text/plain,preview)',
+      '::video{src="JaVaScRiPt:"}',
+      '[local](docs/guide.md) [section](#section) [email](mailto:editor@example.org)',
+      '![image](data:image/png;base64,AA==)'
+    ].join('\n\n'))
+    expect(contentHtml).toContain('<a>unused</a> and <a>data</a>')
+    expect(contentHtml).toContain('<source>')
+    expect(contentHtml).not.toMatch(/(?:href|src)="javascript:/i)
+    expect(contentHtml).toContain('href="docs/guide.md"')
+    expect(contentHtml).toContain('href="#section"')
+    expect(contentHtml).toContain('href="mailto:editor@example.org"')
+    expect(contentHtml).toContain('src="data:image/png;base64,AA=="')
+  })
+
   it('drops raw HTML by default', async () => {
     const { contentHtml } = await convert(
       'before\n\n<video src="x.mp4"></video>\n\nafter\n'
@@ -527,6 +611,19 @@ describe('raw HTML handling', () => {
       unsafeHtml: true
     })
     expect(contentHtml).toContain('class="katex"')
+  })
+
+  it('preserves footnote navigation and links to sanitized IDs', async () => {
+    const { contentHtml } = await convert(
+      'See [section](#%C3%A9) and note[^1] twice[^1].\n\n' +
+      '<span id="é">Section</span>\n\n[^1]: Note.',
+      { unsafeHtml: true }
+    )
+    const links = [...contentHtml.matchAll(/href="#([^"]+)"/g)]
+    expect(links).toHaveLength(5)
+    for (const [, fragment] of links) {
+      expect(contentHtml).toContain(`id="${decodeURIComponent(fragment)}"`)
+    }
   })
 })
 

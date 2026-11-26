@@ -117,8 +117,9 @@ export function buildPdfOptions(options: RenderPdfOptions): PaperifyPdfOptions {
 
   if (hasHeaderFooter) {
     pdfOptions.displayHeaderFooter = true
-    pdfOptions.headerTemplate = options.headerTemplate ?? ''
-    pdfOptions.footerTemplate = options.footerTemplate ?? ''
+    // Empty strings make Chromium print its own date, title, URL or page count.
+    pdfOptions.headerTemplate = options.headerTemplate || '<span></span>'
+    pdfOptions.footerTemplate = options.footerTemplate || '<span></span>'
   }
 
   return pdfOptions

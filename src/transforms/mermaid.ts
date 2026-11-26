@@ -1,14 +1,12 @@
 /**
- * remark plugin: statically renders fenced Mermaid code blocks as semantic
- * image figures. The renderer itself is injected by the host.
+ * Render Mermaid code blocks after raw HTML sanitization so that generated
+ * image data URIs can be trusted without permitting data URIs in raw HTML.
  */
 
 import { Buffer } from 'node:buffer'
 
 import { visit } from 'unist-util-visit'
-import type { Code, Paragraph, Root } from 'mdast'
-import type { Element } from 'hast'
-import type { Parent } from 'unist'
+import type { Element, Root } from 'hast'
 import type { VFile } from 'vfile'
 
 import type {
@@ -18,16 +16,17 @@ import type {
 } from '../mermaid.js'
 
 interface MermaidInstance {
-  node: Code
+  node: Element
+  definition: string
   index: number
-  parent: Parent
+  parent: Element | Root
 }
 
 function svgDataUri(svg: string): string {
   return `data:image/svg+xml;base64,${Buffer.from(svg, 'utf8').toString('base64')}`
 }
 
-function figureNode(result: MermaidRenderValue): Paragraph {
+function figureNode(result: MermaidRenderValue): Element {
   const description = result.description?.trim()
   const title = result.title?.trim()
   const image: Element = {
@@ -42,15 +41,10 @@ function figureNode(result: MermaidRenderValue): Paragraph {
   }
 
   return {
-    type: 'paragraph',
-    children: [],
-    data: {
-      hName: 'figure',
-      hProperties: {
-        className: ['image-figure', 'mermaid-figure']
-      },
-      hChildren: [image]
-    }
+    type: 'element',
+    tagName: 'figure',
+    properties: { className: ['image-figure', 'mermaid-figure'] },
+    children: [image]
   }
 }
 
@@ -70,15 +64,25 @@ function renderFailure(
   }
 }
 
-export default function remarkMermaid(
+export default function rehypeMermaid(
   options?: MermaidConversionOptions
 ) {
   return async (tree: Root, file: VFile): Promise<void> => {
     const instances: MermaidInstance[] = []
-    visit(tree, 'code', (node: Code, index, parent) => {
-      if (node.lang?.trim().toLowerCase() !== 'mermaid') return
-      if (!parent || typeof index !== 'number') return
-      instances.push({ node, index, parent })
+    visit(tree, 'element', (node, index, parent) => {
+      if (node.tagName !== 'pre' || !parent || typeof index !== 'number') return
+      if (node.children.length !== 1) return
+      const [code] = node.children
+      if (code?.type !== 'element' || code.tagName !== 'code') return
+      const classes = code.properties.className
+      if (!Array.isArray(classes) || !classes.some(
+        (value) => String(value).toLowerCase() === 'language-mermaid'
+      )) return
+      const [text] = code.children
+      if (text && (text.type !== 'text' || code.children.length !== 1)) return
+      // remark-rehype adds one terminal newline to nonempty fenced code.
+      const definition = text?.value.replace(/\n$/, '') ?? ''
+      instances.push({ node, definition, index, parent })
     })
 
     if (instances.length === 0) return
@@ -97,7 +101,7 @@ export default function remarkMermaid(
     let outcomes: MermaidRenderOutcome[]
     try {
       outcomes = await options.renderer(
-        instances.map((instance) => instance.node.value)
+        instances.map((instance) => instance.definition)
       )
     } catch (error) {
       // Infrastructure failures (most importantly, a missing browser) retain

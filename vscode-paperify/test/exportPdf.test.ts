@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -84,6 +84,24 @@ afterEach(() => {
 })
 
 describe('exportPdfToFile', () => {
+  it('refuses to replace the Markdown source before launching the browser', async () => {
+    const run = fakeLauncher()
+    const inputDir = makeOutputDir()
+    const documentPath = path.join(inputDir, 'paper.md')
+    fs.writeFileSync(documentPath, DOC)
+
+    await expect(exportPdfToFile({
+      markdown: DOC,
+      inputDir,
+      documentPath,
+      outputPath: documentPath,
+      css: '',
+      launch: run.launcher
+    })).rejects.toThrow(/overwrite the input document/)
+    expect(fs.readFileSync(documentPath, 'utf8')).toBe(DOC)
+    expect(run.launchOptions).toHaveLength(0)
+  })
+
   it('exports a PDF through the injected browser and removes the temp directory', async () => {
     const run = fakeLauncher()
     const outputPath = path.join(makeOutputDir(), 'paper.pdf')
@@ -142,6 +160,38 @@ describe('exportPdfToFile', () => {
 
     expect(fs.existsSync(outputPath)).toBe(false)
     expect(fs.existsSync(path.dirname(run.pdfOptions[0].path))).toBe(false)
+  })
+
+  it('preserves the previous PDF if copying to a different volume fails', async () => {
+    const run = fakeLauncher()
+    const outputDir = makeOutputDir()
+    const outputPath = path.join(outputDir, 'paper.pdf')
+    fs.writeFileSync(outputPath, 'previous PDF')
+    const rename = vi.spyOn(fs.promises, 'rename').mockRejectedValueOnce(
+      Object.assign(new Error('different volumes'), { code: 'EXDEV' })
+    )
+    const copy = vi.spyOn(fs.promises, 'copyFile').mockImplementationOnce(
+      async (_from, to) => {
+        await fs.promises.writeFile(to, 'partial PDF')
+        throw new Error('copy interrupted')
+      }
+    )
+    try {
+      await expect(exportPdfToFile({
+        markdown: DOC,
+        inputDir: fixturesDir,
+        outputPath,
+        css: '',
+        browserExecutablePath: process.execPath,
+        launch: run.launcher
+      })).rejects.toThrow('copy interrupted')
+
+      expect(fs.readFileSync(outputPath, 'utf8')).toBe('previous PDF')
+      expect(fs.readdirSync(outputDir)).toEqual(['paper.pdf'])
+    } finally {
+      rename.mockRestore()
+      copy.mockRestore()
+    }
   })
 
   it('preserves the document print math size in the compiled HTML sent to PDF', async () => {

@@ -131,11 +131,13 @@ describe('preview rendering', () => {
   })
 
   it('rewrites local video sources to webview resource URIs', async () => {
-    const { html } = await render(doc('::video{src="media/demo.mp4"}'))
+    const { html, warnings } = await render(
+      doc('::video{src="media/%64emo.mp4?version=1#t=2"}')
+    )
 
     const expected = `vscode-webview://mock${path.join(fixturesDir, 'media', 'demo.mp4')}`
-    expect(html).toContain(`src="${expected}"`)
-    expect(html).not.toContain('src="media/demo.mp4"')
+    expect(warnings).toEqual([])
+    expect(html).toContain(`src="${expected}?version=1#t=2"`)
   })
 
   it('treats missing assets as warnings, not failures', async () => {

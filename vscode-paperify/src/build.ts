@@ -43,6 +43,8 @@ export interface BuildRequest {
   documentPath?: string
   /** CSS embedded into the generated document. */
   css: string
+  /** Map local video files to webview resource URIs when building a preview. */
+  resolveMediaSource?: (absolutePath: string) => string
   /**
    * With `strictCitations`, citation problems fail the build like the CLI
    * (an export must not silently drop citations). Without it, they degrade
@@ -152,7 +154,8 @@ export async function buildCompiledHtml(request: BuildRequest): Promise<BuildRes
 
   const compiled = compileHtml({
     html: converted.html,
-    inputDir: request.inputDir
+    inputDir: request.inputDir,
+    resolveMediaSource: request.resolveMediaSource
   })
 
   return {

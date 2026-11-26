@@ -46,6 +46,20 @@ describe('PDF rendering options', () => {
     expect(options.headerTemplate).toBe(headerTemplate)
     expect(options.footerTemplate).toBe(footerTemplate)
   })
+
+  it.each(['headerTemplate', 'footerTemplate'] as const)(
+    'suppresses the Chromium default on the other side when only %s is supplied',
+    (side) => {
+      const options = buildPdfOptions({
+        htmlPath: '/tmp/input.html',
+        outputPath: '/tmp/output.pdf',
+        [side]: '<div>Custom</div>'
+      })
+
+      expect(options[side]).toBe('<div>Custom</div>')
+      expect(options[side === 'headerTemplate' ? 'footerTemplate' : 'headerTemplate']).toBe('<span></span>')
+    }
+  )
 })
 
 interface FakeBrowserRun {

@@ -78,14 +78,14 @@ export class PdfExportController implements vscode.Disposable {
       return false
     }
 
-    const target = await vscode.window.showSaveDialog({
-      defaultUri: defaultPdfUri(document),
-      filters: { PDF: ['pdf'] }
-    })
-    if (!target) return false
-
     this.inFlight.add(key)
     try {
+      const target = await vscode.window.showSaveDialog({
+        defaultUri: defaultPdfUri(document),
+        filters: { PDF: ['pdf'] }
+      })
+      if (!target) return false
+
       const result = await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,

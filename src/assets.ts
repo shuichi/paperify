@@ -9,18 +9,30 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { visit } from 'unist-util-visit'
 import type { Root, Element } from 'hast'
 
 /** True when the reference points at a local file (not a URL/data/anchor). */
 export function isLocalAsset(ref: string): boolean {
-  if (!ref) return false
-  if (ref.startsWith('#')) return false
-  if (ref.startsWith('//')) return false
-  if (ref.startsWith('data:')) return false
-  if (/^[a-z][a-z0-9+.-]*:/i.test(ref)) return false
-  if (path.isAbsolute(ref)) return false
-  return true
+  const value = ref.replace(/[\t\n\r]/g, '').trim()
+  return value !== '' && !/^[#?/\\]|^[a-z][a-z0-9+.-]*:/i.test(value)
+}
+
+/** Resolve a document-relative URL, retaining the suffix for rewritten media. */
+export function resolveLocalAsset(ref: string, inputDir: string) {
+  if (!isLocalAsset(ref)) return undefined
+  try {
+    const base = pathToFileURL(path.resolve(inputDir) + path.sep)
+    const url = new URL(ref, base)
+    // A literal percent sign is valid in a filename such as "50%.svg".
+    url.pathname = url.pathname.replace(/%(?![\da-f]{2})/gi, '%25')
+    const filePath = fileURLToPath(url)
+    if (filePath.includes('\0')) return undefined
+    return { filePath, search: url.search, hash: url.hash }
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -54,6 +66,26 @@ export interface CopyAssetsResult {
   missing: string[]
 }
 
+function outsideDirectory(relativePath: string): boolean {
+  return relativePath === '..' ||
+    relativePath.startsWith('..' + path.sep) ||
+    path.isAbsolute(relativePath)
+}
+
+function canWriteDestination(root: string, destination: string): boolean {
+  // Resolve the closest existing ancestor before creating any subdirectories.
+  // A dangling link has no verifiable target.
+  let ancestor = destination
+  while (!fs.lstatSync(ancestor, { throwIfNoEntry: false })) {
+    ancestor = path.dirname(ancestor)
+  }
+  try {
+    return !outsideDirectory(path.relative(root, fs.realpathSync(ancestor)))
+  } catch {
+    return false
+  }
+}
+
 /**
  * Copy collected assets from the input document's directory into the
  * output directory, preserving relative paths. Missing files are
@@ -69,20 +101,36 @@ export function copyAssets(
   const missing: string[] = []
 
   for (const asset of assets) {
-    const normalized = path.normalize(asset)
-    if (normalized.startsWith('..')) {
-      // Refuse to write outside the output directory.
+    const resolved = resolveLocalAsset(asset, inputDir)
+    const sourceStat = resolved && fs.statSync(resolved.filePath, { throwIfNoEntry: false })
+    if (!resolved || !sourceStat?.isFile()) {
       missing.push(asset)
       continue
     }
-    const from = path.resolve(inputDir, normalized)
-    const to = path.resolve(outputDir, normalized)
-    if (!fs.existsSync(from)) {
+    const relativePath = path.relative(inputDir, resolved.filePath)
+    if (outsideDirectory(relativePath)) {
+      missing.push(asset)
+      continue
+    }
+    fs.mkdirSync(outputDir, { recursive: true })
+    const root = fs.realpathSync(outputDir)
+    const to = path.join(root, relativePath)
+    if (!canWriteDestination(root, to)) {
+      missing.push(asset)
+      continue
+    }
+    const targetStat = fs.statSync(to, { throwIfNoEntry: false })
+    if (targetStat?.dev === sourceStat.dev && targetStat.ino === sourceStat.ino) {
+      copied.push(asset)
+      continue
+    }
+    if (targetStat && (!targetStat.isFile() || targetStat.nlink > 1)) {
+      // Writing a hard-linked file could overwrite another directory's copy.
       missing.push(asset)
       continue
     }
     fs.mkdirSync(path.dirname(to), { recursive: true })
-    fs.copyFileSync(from, to)
+    fs.copyFileSync(resolved.filePath, to)
     copied.push(asset)
   }
 

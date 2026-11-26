@@ -163,10 +163,11 @@ describe('PdfExportController', () => {
 
     const document = makeDocument('/docs/paper.md', PAPERIFY_DOC)
     const first = controller.exportDocument(document as never)
+    const second = controller.exportDocument(document as never)
     await flush()
 
-    const second = await controller.exportDocument(document as never)
-    expect(second).toBe(false)
+    expect(__mock.saveDialogCalls).toHaveLength(1)
+    expect(await second).toBe(false)
     expect(__mock.messages).toContain(EXPORT_IN_PROGRESS_MESSAGE)
 
     pending.resolve({ warnings: [] })

@@ -82,14 +82,14 @@ export class HtmlExportController implements vscode.Disposable {
       return false
     }
 
-    const target = await vscode.window.showSaveDialog({
-      defaultUri: defaultHtmlUri(document),
-      filters: { HTML: ['html'] }
-    })
-    if (!target) return false
-
     this.inFlight.add(key)
     try {
+      const target = await vscode.window.showSaveDialog({
+        defaultUri: defaultHtmlUri(document),
+        filters: { HTML: ['html'] }
+      })
+      if (!target) return false
+
       const result = await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,

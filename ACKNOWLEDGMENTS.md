@@ -22,6 +22,7 @@ of `package.json`; development-only dependencies are not included.
 | --- | ---: | --- | --- |
 | [gray-matter](https://www.npmjs.com/package/gray-matter) | 4.0.3 | MIT | YAML frontmatter extraction |
 | [mdast-util-directive](https://www.npmjs.com/package/mdast-util-directive) | 3.1.0 | MIT | Markdown directive node support |
+| [parse5](https://www.npmjs.com/package/parse5) | 7.3.0 | MIT | Locating media attributes in compiled HTML |
 | [rehype-highlight](https://www.npmjs.com/package/rehype-highlight) | 7.0.2 | MIT | Static syntax highlighting |
 | [rehype-katex](https://www.npmjs.com/package/rehype-katex) | 7.0.1 | MIT | Static math rendering in the HTML pipeline |
 | [rehype-raw](https://www.npmjs.com/package/rehype-raw) | 7.0.0 | MIT | Parsing enabled raw HTML |

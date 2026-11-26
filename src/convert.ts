@@ -8,10 +8,11 @@
  *   remark-gfm         tables, footnotes, strikethrough, autolinks
  *   remark-math        $inline$ and $$display$$ math
  *   remark-directive   ::figure / ::video directives
- *   (paperify)         figure, video & static Mermaid transforms
+ *   (paperify)         figure and video transforms
  *   remark-rehype      mdast → hast
  *   rehype-raw         only with --unsafe-html
  *   rehype-sanitize    only with --unsafe-html (allowlist schema)
+ *   (paperify)         static Mermaid images
  *   rehype-katex       static, build-time math rendering
  *   rehype-highlight   static, build-time syntax highlighting
  *   rehype-slug        stable heading IDs
@@ -40,8 +41,11 @@ import { collectAssets } from './assets.js'
 import remarkImageFigures from './transforms/figures.js'
 import remarkFigureDirective from './transforms/figureDirective.js'
 import remarkVideoDirective from './transforms/videoDirective.js'
-import remarkMermaid from './transforms/mermaid.js'
-import sanitizeSchema from './transforms/sanitizeSchema.js'
+import rehypeMermaid from './transforms/mermaid.js'
+import sanitizeSchema, {
+  rehypeMarkdownUrls,
+  rehypeSanitizedFragmentLinks
+} from './transforms/sanitizeSchema.js'
 import type { CitationOptions, CitationState } from './citations.js'
 import type { MermaidConversionOptions } from './mermaid.js'
 
@@ -97,21 +101,30 @@ function buildProcessor(
     .use(remarkDirective)
     .use(remarkFigureDirective)
     .use(remarkVideoDirective)
-    .use(remarkImageFigures)
-    .use(remarkMermaid, options.mermaid)
 
   if (citations) {
     processor = processor.use(citations.module.remarkCitations(citations.state))
   }
 
   processor = processor
+    .use(remarkImageFigures)
     .use(remarkRehype, { allowDangerousHtml: Boolean(options.unsafeHtml) })
 
   if (options.unsafeHtml) {
-    processor = processor.use(rehypeRaw).use(rehypeSanitize, sanitizeSchema)
+    processor = processor
+      .use(rehypeRaw)
+      .use(rehypeSanitize, sanitizeSchema)
+      .use(rehypeSanitizedFragmentLinks)
+  } else {
+    processor = processor.use(rehypeMarkdownUrls)
+  }
+
+  if (citations) {
+    processor = processor.use(citations.module.rehypeCitations(citations.state))
   }
 
   return processor
+    .use(rehypeMermaid, options.mermaid)
     .use(rehypeKatex)
     .use(rehypeHighlight, { detect: false })
     .use(rehypeSlug)
@@ -145,16 +158,8 @@ export async function convert(
 
   const warnings = file.messages.map((m) => m.reason)
 
-  if (citations) {
-    const rendered = citations.module.renderCitations(citations.state)
-    contentHtml = citations.module.applyCitationHtml(
-      contentHtml,
-      citations.state,
-      rendered.citations
-    )
-    if (rendered.bibliographyHtml) {
-      contentHtml = `${contentHtml}\n${rendered.bibliographyHtml}`
-    }
+  if (citations?.state.bibliographyHtml) {
+    contentHtml = `${contentHtml}\n${citations.state.bibliographyHtml}`
   }
 
   const effectiveMeta: PaperMeta = {

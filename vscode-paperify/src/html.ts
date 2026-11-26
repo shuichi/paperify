@@ -9,7 +9,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import type { MermaidRenderer } from 'paperify/api'
+import { assertDistinctOutputPath, type MermaidRenderer } from 'paperify/api'
 
 import { buildCompiledHtml } from './build'
 
@@ -38,6 +38,9 @@ export interface ExportHtmlResult {
 export async function exportHtmlToFile(
   request: ExportHtmlRequest
 ): Promise<ExportHtmlResult> {
+  if (request.documentPath) {
+    assertDistinctOutputPath(request.documentPath, request.outputPath)
+  }
   // Finish conversion before touching the destination, so conversion errors
   // never truncate an existing file selected in the save dialog.
   const built = await buildCompiledHtml({

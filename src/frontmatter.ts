@@ -119,8 +119,21 @@ function normalizeKeywords(value: unknown): string[] {
  * simply yields empty metadata.
  */
 export function parseFrontmatter(source: string): FrontmatterResult {
-  const parsed = matter(source)
-  const data = (parsed.data ?? {}) as Record<string, unknown>
+  // gray-matter normally lets the opening line select a parser. Papers
+  // accept only YAML, including its explicit yaml/yml aliases.
+  const markdown = source.replace(/^\uFEFF/, '')
+  const opening = /^---[ \t]*(?:ya?ml[ \t]*)?\r?\n/i.exec(markdown)
+  const closing = opening && /\n---[ \t]*(?:\r?\n|$)/.exec(markdown)
+  let content = markdown
+  let data: Record<string, unknown> = {}
+  if (opening && closing) {
+    // Pass gray-matter a canonical block with a line-terminated delimiter:
+    // a YAML key such as "---draft" must not terminate the block early.
+    // Providing options also bypasses its process-wide document cache.
+    const yaml = markdown.slice(opening[0].length, closing.index)
+    data = matter(`---\n${yaml}\n---\n`, { delimiters: ['---', '---\n'] }).data ?? {}
+    content = markdown.slice(closing.index + closing[0].length)
+  }
 
   const meta: PaperMeta = {
     title: asString(data.title),
@@ -137,5 +150,5 @@ export function parseFrontmatter(source: string): FrontmatterResult {
     paperify: data.paperify === true ? true : undefined
   }
 
-  return { content: parsed.content, meta }
+  return { content, meta }
 }

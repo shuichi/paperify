@@ -1,5 +1,8 @@
 import { createRequire } from 'node:module'
+import { randomUUID } from 'node:crypto'
 
+import type { Element, Root } from 'hast'
+import rehypeRaw from 'rehype-raw'
 import type { Plugin } from 'unified'
 
 import { escapeHtml } from './template.js'
@@ -25,8 +28,6 @@ const cslLocales = require('@citation-js/plugin-csl/lib/locales.json') as Record
   string
 >
 
-const PLACEHOLDER_PREFIX = 'PAPERIFY_CITATION_PLACEHOLDER_'
-
 export interface CitationOptions {
   /** BibTeX database text. */
   bibtex: string
@@ -44,6 +45,7 @@ export interface CitationState {
   clusters: CitationCluster[]
   referenceIds: Map<string, string>
   usedReferenceIds: Set<string>
+  bibliographyHtml: string
 }
 
 interface CslItem {
@@ -54,14 +56,21 @@ interface CslItem {
 
 interface CitationCluster {
   citationId: string
-  placeholder: string
+  marker: string
   items: CitationItem[]
+}
+
+interface FormattedCitation {
+  cites: string
+  href: string
+  html: string
 }
 
 interface MdastNode {
   type: string
   value?: string
   children?: MdastNode[]
+  data?: { hName: string; hProperties: { className: string[] } }
 }
 
 interface CiteprocSys {
@@ -115,7 +124,8 @@ export function createCitationState(options: CitationOptions): CitationState {
     items,
     clusters: [],
     referenceIds: new Map(),
-    usedReferenceIds: new Set()
+    usedReferenceIds: new Set(),
+    bibliographyHtml: ''
   }
 }
 
@@ -127,8 +137,8 @@ export function remarkCitations(state: CitationState): Plugin<[], MdastNode> {
   }
 }
 
-export function renderCitations(state: CitationState): {
-  citations: Map<string, string>
+function renderCitations(state: CitationState): {
+  citations: Map<string, FormattedCitation>
   bibliographyHtml: string
 } {
   if (state.clusters.length === 0) {
@@ -137,7 +147,7 @@ export function renderCitations(state: CitationState): {
 
   const engine = createEngine(state)
   const citationsPre: Array<[string, number]> = []
-  const renderedCitations = new Map<string, string>()
+  const renderedCitations = new Map<string, FormattedCitation>()
 
   for (const cluster of state.clusters) {
     validateCluster(state, cluster)
@@ -164,17 +174,10 @@ export function renderCitations(state: CitationState): {
       const renderedCluster = state.clusters.find(
         (candidate) => candidate.citationId === citationId
       )
-      const cites = renderedCluster
-        ? renderedCluster.items.map((item) => item.id).join(' ')
-        : ''
-      const firstItemId = renderedCluster?.items[0]?.id
-      const href = firstItemId
-        ? ` href="#${escapeHtml(referenceIdForKey(state, firstItemId))}"`
-        : ''
-      renderedCitations.set(
-        citationId,
-        `<a class="citation" data-cites="${escapeHtml(cites)}"${href}>${html}</a>`
-      )
+      if (!renderedCluster) continue
+      const cites = renderedCluster.items.map((item) => item.id).join(' ')
+      const href = `#${referenceIdForKey(state, renderedCluster.items[0].id)}`
+      renderedCitations.set(renderedCluster.marker, { cites, href, html })
     }
 
     citationsPre.push([cluster.citationId, 0])
@@ -204,18 +207,39 @@ export function renderCitations(state: CitationState): {
   return { citations: renderedCitations, bibliographyHtml }
 }
 
-export function applyCitationHtml(
-  contentHtml: string,
-  state: CitationState,
-  renderedCitations: Map<string, string>
-): string {
-  let html = contentHtml
-  for (const cluster of state.clusters) {
-    const rendered = renderedCitations.get(cluster.citationId)
-    if (!rendered) continue
-    html = html.split(cluster.placeholder).join(rendered)
+/** Insert formatted citations only at the spans created by the Markdown pass. */
+export function rehypeCitations(state: CitationState): Plugin<[], Root> {
+  return () => (tree, file) => {
+    const { citations, bibliographyHtml } = renderCitations(state)
+    state.bibliographyHtml = bibliographyHtml
+    if (citations.size === 0) return
+
+    const parseFragment = rehypeRaw()
+    function replaceMarkers(parent: Root | Element, insideLink: boolean): void {
+      for (const node of parent.children) {
+        if (node.type !== 'element') continue
+        const classes = node.properties.className
+        const formatted = node.tagName === 'span' && Array.isArray(classes)
+          ? citations.get(String(classes[0]))
+          : undefined
+        if (formatted) {
+          node.tagName = insideLink ? 'span' : 'a'
+          node.properties = {
+            className: ['citation'],
+            dataCites: formatted.cites,
+            ...(insideLink ? {} : { href: formatted.href })
+          }
+          const fragment = parseFragment({
+            type: 'root', children: [{ type: 'raw', value: formatted.html }]
+          }, file)
+          node.children = fragment.children.filter((child) => child.type !== 'doctype')
+        } else {
+          replaceMarkers(node, insideLink || node.tagName === 'a')
+        }
+      }
+    }
+    replaceMarkers(tree, false)
   }
-  return html
 }
 
 function transformTextNodes(node: MdastNode, state: CitationState): void {
@@ -254,7 +278,11 @@ function splitCitationText(
     }
 
     const cluster = createCluster(state, items)
-    nodes.push({ type: 'text', value: cluster.placeholder })
+    nodes.push({
+      type: 'text',
+      value: match[0],
+      data: { hName: 'span', hProperties: { className: [cluster.marker] } }
+    })
     lastIndex = match.index + match[0].length
   }
 
@@ -274,7 +302,7 @@ function createCluster(
   const index = state.clusters.length
   const cluster: CitationCluster = {
     citationId: `paperify-citation-${index + 1}`,
-    placeholder: `${PLACEHOLDER_PREFIX}${index + 1}_`,
+    marker: `paperify-citation-${randomUUID()}`,
     items
   }
   state.clusters.push(cluster)

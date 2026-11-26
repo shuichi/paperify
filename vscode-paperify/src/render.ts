@@ -7,17 +7,14 @@
  * The Markdown -> compiled standalone HTML pipeline is shared with PDF
  * export (build.ts); this module adds only the webview-specific layers:
  *
- *   buildCompiledHtml()  shared pipeline, citations degrade to warnings
+ *   buildCompiledHtml()  shared pipeline, with local media mapped to webview
+ *                        URIs and citation problems reported as warnings
  *   (here)               reverts VS Code's webview default styles via a
  *                        reset stylesheet placed before paperify.css
- *   (here)               rewrites local video/source src to webview URIs
  *   (here)               injects a strict Content-Security-Policy
  */
 
-import fs from 'node:fs'
-import path from 'node:path'
-
-import { isLocalAsset, type MermaidRenderer } from 'paperify/api'
+import type { MermaidRenderer } from 'paperify/api'
 
 import { buildCompiledHtml } from './build'
 
@@ -92,43 +89,6 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
-function decodeHtmlAttribute(value: string): string {
-  return value
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-}
-
-/**
- * `compileHtml()` intentionally leaves video/source `src` untouched (they are
- * not inlined as data URIs). For the webview those local files must be
- * reachable through a webview resource URI instead.
- */
-function resolveLocalMediaSources(
-  html: string,
-  inputDir: string,
-  resolveResource: (absolutePath: string) => string,
-  warnings: string[]
-): string {
-  return html.replace(
-    /(<(?:video|source)\b[^>]*?\bsrc=")([^"]*)(")/gi,
-    (match, before: string, src: string, after: string) => {
-      const decoded = decodeHtmlAttribute(src)
-      if (!isLocalAsset(decoded)) return match
-
-      const filePath = path.resolve(inputDir, decoded)
-      if (!fs.existsSync(filePath)) {
-        warnings.push(`video asset not found, left as-is: ${decoded}`)
-        return match
-      }
-
-      return `${before}${escapeHtml(resolveResource(filePath))}${after}`
-    }
-  )
-}
-
 function contentSecurityPolicy(cspSource: string): string {
   return [
     "default-src 'none'",
@@ -164,20 +124,13 @@ export async function renderPreviewHtml(
     documentPath: request.documentPath,
     css: `${WEBVIEW_RESET_CSS}\n\n${request.css}`,
     fetchCslXml: request.fetchCslXml,
-    mermaidRenderer: request.mermaidRenderer
+    mermaidRenderer: request.mermaidRenderer,
+    resolveMediaSource: request.resolveResource
   })
 
-  const mediaWarnings: string[] = []
-  const withMedia = resolveLocalMediaSources(
-    built.html,
-    request.inputDir,
-    request.resolveResource,
-    mediaWarnings
-  )
-
   return {
-    html: injectCsp(withMedia, request.cspSource),
-    warnings: [...built.warnings, ...mediaWarnings]
+    html: injectCsp(built.html, request.cspSource),
+    warnings: built.warnings
   }
 }
 

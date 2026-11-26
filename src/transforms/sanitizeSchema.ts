@@ -14,6 +14,8 @@
  */
 
 import { defaultSchema } from 'rehype-sanitize'
+import type { Root } from 'hast'
+import { visit } from 'unist-util-visit'
 
 type Schema = typeof defaultSchema
 
@@ -75,3 +77,53 @@ export const sanitizeSchema: Schema = {
 }
 
 export default sanitizeSchema
+
+/** Check Markdown and directive URLs even when the raw HTML pipeline is off. */
+export function rehypeMarkdownUrls() {
+  return (tree: Root) => {
+    visit(tree, 'element', ({ properties }) => {
+      for (const key of ['href', 'src', 'poster']) {
+        const url = properties[key]
+        if (typeof url !== 'string') continue
+        // Relative references have no protocol. Use browser URL parsing for
+        // absolute URLs so case and whitespace are handled consistently.
+        const protocol = URL.parse(url)?.protocol
+        if (
+          protocol === 'javascript:' || protocol === 'vbscript:' ||
+          (key === 'href' && protocol === 'data:')
+        ) {
+          delete properties[key]
+        }
+      }
+    })
+  }
+}
+
+/** Keep fragment links pointed at IDs and named anchors renamed by sanitize. */
+export function rehypeSanitizedFragmentLinks() {
+  return (tree: Root) => {
+    const prefix = sanitizeSchema.clobberPrefix
+    if (!prefix) return
+    const targets = new Set<string>()
+    visit(tree, 'element', ({ properties, tagName }) => {
+      if (typeof properties.id === 'string') targets.add(properties.id)
+      if (tagName === 'a' && typeof properties.name === 'string') {
+        targets.add(properties.name)
+      }
+    })
+    visit(tree, 'element', ({ tagName, properties }) => {
+      const { href } = properties
+      if (tagName !== 'a' || typeof href !== 'string' || !href.startsWith('#')) return
+      const fragment = href.slice(1)
+      let target = fragment
+      try {
+        target = decodeURIComponent(fragment)
+      } catch {
+        // A fragment may literally contain a percent sign.
+      }
+      if (targets.has(prefix + fragment) || targets.has(prefix + target)) {
+        properties.href = '#' + prefix + fragment
+      }
+    })
+  }
+}
